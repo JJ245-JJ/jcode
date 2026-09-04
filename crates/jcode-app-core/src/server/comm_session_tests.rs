@@ -104,12 +104,14 @@ async fn resolve_spawn_working_dir_prefers_explicit_then_spawner_agent_dir() {
             &swarm_members,
         )
         .await
+        .unwrap()
         .as_deref(),
         Some("/tmp/explicit")
     );
     assert_eq!(
         resolve_spawn_working_dir(None, "req", &sessions, &swarm_members)
             .await
+            .unwrap()
             .as_deref(),
         Some("/tmp/spawner-agent")
     );
@@ -129,9 +131,51 @@ async fn resolve_spawn_working_dir_falls_back_to_member_dir() {
     assert_eq!(
         resolve_spawn_working_dir(None, "req", &sessions, &swarm_members)
             .await
+            .unwrap()
             .as_deref(),
         Some("/tmp/member-dir")
     );
+}
+
+#[tokio::test]
+async fn resolve_spawn_working_dir_rejects_nonexistent_dir_with_clear_error() {
+    let sessions = Arc::new(RwLock::new(HashMap::new()));
+    let swarm_members = Arc::new(RwLock::new(HashMap::new()));
+
+    let err = resolve_spawn_working_dir(
+        Some("/definitely/not/a/real/path".to_string()),
+        "req",
+        &sessions,
+        &swarm_members,
+    )
+    .await
+    .unwrap_err();
+    let message = format!("{err:#}");
+    assert!(
+        message.contains("working_dir does not exist"),
+        "expected clear error, got: {message}"
+    );
+    assert!(message.contains("/definitely/not/a/real/path"));
+}
+
+#[tokio::test]
+async fn resolve_spawn_working_dir_expands_tilde() {
+    let sessions = Arc::new(RwLock::new(HashMap::new()));
+    let swarm_members = Arc::new(RwLock::new(HashMap::new()));
+    let home = dirs::home_dir().expect("home dir").join("tilde-spawn-fixture");
+    std::fs::create_dir_all(&home).expect("fixture dir");
+
+    let resolved = resolve_spawn_working_dir(
+        Some("~/tilde-spawn-fixture".to_string()),
+        "req",
+        &sessions,
+        &swarm_members,
+    )
+    .await
+    .unwrap()
+    .expect("some dir");
+    assert_eq!(std::path::Path::new(&resolved), home);
+    std::fs::remove_dir(&home).ok();
 }
 
 #[test]
