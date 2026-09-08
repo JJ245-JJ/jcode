@@ -372,11 +372,14 @@ impl Agent {
             allowed.remove(&disabled);
         }
         self.allowed_tools = Some(allowed);
-        crate::tool::set_session_tool_policy(
+        // v0.84 made session tool policies registration-based (auto-cleared on
+        // drop); hold the registration on the Agent for the session lifetime.
+        let registration = crate::tool::register_session_tool_policy(
             &self.session.id,
             self.allowed_tools.clone(),
             self.disabled_tools.clone(),
         );
+        self.session_tool_policy_registration = Some(registration);
     }
 
     /// Mark this session as an inline swarm worker. When enabled, the streaming

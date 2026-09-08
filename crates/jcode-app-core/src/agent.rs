@@ -188,6 +188,10 @@ pub struct Agent {
     disabled_tools: HashSet<String>,
     /// Generation-scoped ownership of this Agent's global tool-policy entry.
     _tool_policy_registration: crate::tool::SessionToolPolicyRegistration,
+    /// Replacement policy registration installed by
+    /// set_lean_swarm_worker_tools (v0.84: one active registration per
+    /// session; this one supersedes the boot-time registration).
+    session_tool_policy_registration: Option<crate::tool::SessionToolPolicyRegistration>,
     /// MCP top-level definition exposure policy captured when the session starts.
     mcp_tools_mode: crate::config::McpToolsMode,
     /// Auto-mode token estimate above which MCP definitions are deferred.
@@ -312,6 +316,7 @@ impl Agent {
             allowed_tools,
             disabled_tools,
             _tool_policy_registration: tool_policy_registration,
+            session_tool_policy_registration: None,
             mcp_tools_mode: tool_config.mcp_tools,
             mcp_tools_token_threshold: tool_config.mcp_tools_token_threshold,
             provider_session_id: None,
