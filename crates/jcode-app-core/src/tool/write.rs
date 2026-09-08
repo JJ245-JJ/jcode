@@ -63,7 +63,12 @@ impl Tool for WriteTool {
         if let Some(parent) = path.parent()
             && !parent.exists()
         {
-            tokio::fs::create_dir_all(parent).await?;
+            if let Err(err) = tokio::fs::create_dir_all(parent).await {
+                return Err(anyhow::anyhow!(
+                    "cannot create parent directory {}: {err}. Check the path spelling (e.g. username) and permissions.",
+                    parent.display()
+                ));
+            }
         }
 
         // Check if file existed before and read old content for diff
