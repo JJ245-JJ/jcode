@@ -59,7 +59,16 @@ pub(super) async fn create_headless_session(
     let working_dir = if let Some(path_str) = command.strip_prefix("create_session:") {
         let path_str = path_str.trim();
         if !path_str.is_empty() {
-            Some(std::path::PathBuf::from(path_str))
+            let dir = jcode_tool_core::expand_tilde(path_str)
+                .unwrap_or_else(|| std::path::PathBuf::from(path_str));
+            // Fail fast on a bad working_dir instead of producing a session
+            // whose bash tool cannot even spawn (cwd does not exist).
+            anyhow::ensure!(
+                dir.is_dir(),
+                "working_dir does not exist: {}. Pass a valid directory when spawning.",
+                dir.display()
+            );
+            Some(dir)
         } else {
             None
         }
@@ -97,6 +106,12 @@ pub(super) async fn create_headless_session(
         report_back_to_session_id.clone(),
     );
     new_agent.set_memory_enabled(memory_enabled);
+    // Lean swarm worker surface (local patch): workers spawned via the swarm
+    // tool get the lean toolset. Ordinary headless sessions (e.g. jcode run)
+    // keep the configured profile.
+    if report_back_to_session_id.is_some() {
+        new_agent.set_lean_swarm_worker_tools();
+    }
     // Inline swarm mode renders a live gallery of worker viewports in the
     // coordinator TUI; enable the per-agent output tap so this worker streams a
     // throttled output tail onto the bus.

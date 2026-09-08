@@ -130,6 +130,10 @@ impl ToolContext {
     }
 
     pub fn resolve_path(&self, path: &Path) -> PathBuf {
+        let as_str = path.to_string_lossy();
+        if let Some(expanded) = expand_tilde(&as_str) {
+            return expanded;
+        }
         if path.is_absolute() {
             path.to_path_buf()
         } else if let Some(ref base) = self.working_dir {
@@ -138,6 +142,19 @@ impl ToolContext {
             path.to_path_buf()
         }
     }
+}
+
+/// Expand a leading `~` or `~/...` to the user's home directory.
+/// Non-tilde paths and bare `~`-prefixed names (e.g. `~foo`) return None so
+/// callers fall through to their normal handling.
+pub fn expand_tilde(path: &str) -> Option<PathBuf> {
+    if path == "~" {
+        return dirs::home_dir();
+    }
+    let rest = path
+        .strip_prefix("~/")
+        .or_else(|| path.strip_prefix("~\\"))?;
+    dirs::home_dir().map(|home| home.join(rest))
 }
 
 /// A tool that can be executed by the agent.
@@ -282,5 +299,49 @@ mod escape_hatch_tests {
         // ever diverge, the flag would be advertised but never honored, which is
         // worse than not offering it at all.
         assert_eq!(ACCEPT_LARGE_OUTPUT_KEY, "accept_large_output");
+    }
+
+    #[test]
+    fn tilde_expansion_resolves_home_paths() {
+        let home = dirs::home_dir().expect("home dir available");
+        assert_eq!(expand_tilde("~").as_deref(), Some(home.as_path()));
+        assert_eq!(
+            expand_tilde("~/some/file.txt").as_deref(),
+            Some(home.join("some/file.txt").as_path())
+        );
+    }
+
+    #[test]
+    fn tilde_expansion_ignores_non_tilde_and_other_user_names() {
+        assert_eq!(expand_tilde("/Users/a/file"), None);
+        assert_eq!(expand_tilde("relative/path"), None);
+        assert_eq!(expand_tilde("~otheruser/file"), None);
+        assert_eq!(expand_tilde("~nottilde"), None);
+    }
+
+    #[test]
+    fn resolve_path_expands_tilde_and_falls_back_to_working_dir() {
+        let ctx = crate::ToolContext {
+            session_id: "s".into(),
+            message_id: "m".into(),
+            tool_call_id: "t".into(),
+            working_dir: Some(std::path::PathBuf::from("/tmp/base")),
+            stdin_request_tx: None,
+            graceful_shutdown_signal: None,
+            execution_mode: crate::ToolExecutionMode::AgentTurn,
+        };
+        let home = dirs::home_dir().expect("home dir available");
+        assert_eq!(
+            ctx.resolve_path(std::path::Path::new("~/x.txt")).as_path(),
+            home.join("x.txt").as_path()
+        );
+        assert_eq!(
+            ctx.resolve_path(std::path::Path::new("rel.txt")).as_path(),
+            std::path::Path::new("/tmp/base/rel.txt")
+        );
+        assert_eq!(
+            ctx.resolve_path(std::path::Path::new("/abs.txt")).as_path(),
+            std::path::Path::new("/abs.txt")
+        );
     }
 }

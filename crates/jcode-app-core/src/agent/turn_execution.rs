@@ -347,6 +347,41 @@ impl Agent {
         }
     }
 
+    /// Lean swarm worker surface (local patch): restrict a spawned worker to a
+    /// small editing/exploration toolset plus the swarm tool (report/DM) and
+    /// batch. Cuts worker context so the shared Opus quota lasts longer.
+    /// Root sessions are untouched.
+    pub(crate) fn set_lean_swarm_worker_tools(&mut self) {
+        let mut allowed: HashSet<String> = [
+            "bash",
+            "read",
+            "write",
+            "edit",
+            "multiedit",
+            "apply_patch",
+            "patch",
+            "agentgrep",
+            "ls",
+            "swarm",
+            "batch",
+        ]
+        .into_iter()
+        .map(|name| name.to_string())
+        .collect();
+        for disabled in self.disabled_tools.drain() {
+            allowed.remove(&disabled);
+        }
+        self.allowed_tools = Some(allowed);
+        // v0.84 made session tool policies registration-based (auto-cleared on
+        // drop); hold the registration on the Agent for the session lifetime.
+        let registration = crate::tool::register_session_tool_policy(
+            &self.session.id,
+            self.allowed_tools.clone(),
+            self.disabled_tools.clone(),
+        );
+        self.session_tool_policy_registration = Some(registration);
+    }
+
     /// Mark this session as an inline swarm worker. When enabled, the streaming
     /// loop publishes a throttled output tail to the global bus so a
     /// coordinator can render a live inline gallery viewport for it.

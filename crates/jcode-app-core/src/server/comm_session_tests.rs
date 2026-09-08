@@ -90,28 +90,37 @@ async fn test_agent_with_working_dir(session_id: &str, working_dir: &str) -> Arc
 #[tokio::test]
 async fn resolve_spawn_working_dir_prefers_explicit_then_spawner_agent_dir() {
     let sessions = Arc::new(RwLock::new(HashMap::new()));
+    let swarm_members = Arc::new(RwLock::new(HashMap::new()));
+    // Validation requires existing dirs: use tempdir fixtures that exist.
+    let explicit = std::env::temp_dir().join("jcode-spawn-test-explicit");
+    let spawner_agent = std::env::temp_dir().join("jcode-spawn-test-spawner");
+    std::fs::create_dir_all(&explicit).expect("explicit fixture");
+    std::fs::create_dir_all(&spawner_agent).expect("spawner fixture");
+    let explicit_str = explicit.display().to_string();
+    let spawner_str = spawner_agent.display().to_string();
     sessions.write().await.insert(
         "req".to_string(),
-        test_agent_with_working_dir("req", "/tmp/spawner-agent").await,
+        test_agent_with_working_dir("req", &spawner_str).await,
     );
-    let swarm_members = Arc::new(RwLock::new(HashMap::new()));
 
     assert_eq!(
         resolve_spawn_working_dir(
-            Some("/tmp/explicit".to_string()),
+            Some(explicit_str.clone()),
             "req",
             &sessions,
             &swarm_members,
         )
         .await
+        .unwrap()
         .as_deref(),
-        Some("/tmp/explicit")
+        Some(explicit_str.as_str())
     );
     assert_eq!(
         resolve_spawn_working_dir(None, "req", &sessions, &swarm_members)
             .await
+            .unwrap()
             .as_deref(),
-        Some("/tmp/spawner-agent")
+        Some(spawner_str.as_str())
     );
 }
 
@@ -119,8 +128,11 @@ async fn resolve_spawn_working_dir_prefers_explicit_then_spawner_agent_dir() {
 async fn resolve_spawn_working_dir_falls_back_to_member_dir() {
     let sessions = Arc::new(RwLock::new(HashMap::new()));
     let swarm_members = Arc::new(RwLock::new(HashMap::new()));
+    let member_dir = std::env::temp_dir().join("jcode-spawn-test-member");
+    std::fs::create_dir_all(&member_dir).expect("member fixture");
+    let member_str = member_dir.display().to_string();
     let (mut req_member, _rx) = member("req", Some("swarm-1"), "coordinator");
-    req_member.working_dir = Some(std::path::PathBuf::from("/tmp/member-dir"));
+    req_member.working_dir = Some(std::path::PathBuf::from(&member_str));
     swarm_members
         .write()
         .await
@@ -129,9 +141,51 @@ async fn resolve_spawn_working_dir_falls_back_to_member_dir() {
     assert_eq!(
         resolve_spawn_working_dir(None, "req", &sessions, &swarm_members)
             .await
+            .unwrap()
             .as_deref(),
-        Some("/tmp/member-dir")
+        Some(member_str.as_str())
     );
+}
+
+#[tokio::test]
+async fn resolve_spawn_working_dir_rejects_nonexistent_dir_with_clear_error() {
+    let sessions = Arc::new(RwLock::new(HashMap::new()));
+    let swarm_members = Arc::new(RwLock::new(HashMap::new()));
+
+    let err = resolve_spawn_working_dir(
+        Some("/definitely/not/a/real/path".to_string()),
+        "req",
+        &sessions,
+        &swarm_members,
+    )
+    .await
+    .unwrap_err();
+    let message = format!("{err:#}");
+    assert!(
+        message.contains("working_dir does not exist"),
+        "expected clear error, got: {message}"
+    );
+    assert!(message.contains("/definitely/not/a/real/path"));
+}
+
+#[tokio::test]
+async fn resolve_spawn_working_dir_expands_tilde() {
+    let sessions = Arc::new(RwLock::new(HashMap::new()));
+    let swarm_members = Arc::new(RwLock::new(HashMap::new()));
+    let home = dirs::home_dir().expect("home dir").join("tilde-spawn-fixture");
+    std::fs::create_dir_all(&home).expect("fixture dir");
+
+    let resolved = resolve_spawn_working_dir(
+        Some("~/tilde-spawn-fixture".to_string()),
+        "req",
+        &sessions,
+        &swarm_members,
+    )
+    .await
+    .unwrap()
+    .expect("some dir");
+    assert_eq!(std::path::Path::new(&resolved), home);
+    std::fs::remove_dir(&home).ok();
 }
 
 #[test]

@@ -109,12 +109,21 @@ async fn resolve_spawn_working_dir(
     req_session_id: &str,
     sessions: &SessionAgents,
     swarm_members: &Arc<RwLock<HashMap<String, SwarmMember>>>,
-) -> Option<String> {
-    if requested_working_dir
+) -> anyhow::Result<Option<String>> {
+    if let Some(dir) = requested_working_dir
         .as_deref()
-        .is_some_and(|dir| !dir.trim().is_empty())
+        .map(str::trim)
+        .filter(|dir| !dir.is_empty())
     {
-        return requested_working_dir;
+        let dir = jcode_tool_core::expand_tilde(dir).unwrap_or_else(|| PathBuf::from(dir));
+        // Validate at the spawn boundary: a nonexistent cwd makes every bash
+        // call fail with a cryptic os error 2 (the shell cannot even spawn).
+        anyhow::ensure!(
+            dir.is_dir(),
+            "working_dir does not exist: {}. Check the path (watch for username typos) and spawn again.",
+            dir.display()
+        );
+        return Ok(Some(dir.to_string_lossy().into_owned()));
     }
 
     if let Some(agent_dir) = {
@@ -127,16 +136,16 @@ async fn resolve_spawn_working_dir(
         })
     } && !agent_dir.trim().is_empty()
     {
-        return Some(agent_dir);
+        return Ok(Some(agent_dir));
     }
 
-    swarm_members
+    Ok(swarm_members
         .read()
         .await
         .get(req_session_id)
         .and_then(|member| member.working_dir.as_ref())
         .map(|dir| dir.display().to_string())
-        .filter(|dir| !dir.trim().is_empty())
+        .filter(|dir| !dir.trim().is_empty()))
 }
 
 /// Launch a headed window for `session_id`, exporting the given spawn context
@@ -595,7 +604,7 @@ pub(super) async fn spawn_swarm_agent(
     client_connections: &ClientConnections,
 ) -> anyhow::Result<String> {
     let resolved_working_dir =
-        resolve_spawn_working_dir(working_dir, req_session_id, sessions, swarm_members).await;
+        resolve_spawn_working_dir(working_dir, req_session_id, sessions, swarm_members).await?;
     let coordinator = resolve_coordinator_spawn_identity(req_session_id, sessions).await;
     let coordinator_is_canary = coordinator.is_canary;
     // Capture the requesting client's terminal env so spawn hooks place the new
