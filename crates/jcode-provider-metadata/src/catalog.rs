@@ -421,6 +421,17 @@ pub const BELVEDIR_PROFILE: OpenAiCompatibleProfile = OpenAiCompatibleProfile {
     requires_api_key: true,
 };
 
+pub const CHEAPERINFERENCE_PROFILE: OpenAiCompatibleProfile = OpenAiCompatibleProfile {
+    id: "cheaperinference",
+    display_name: "Cheaper Inference",
+    api_base: "https://api.cheaperinference.com/v1",
+    api_key_env: "CHEAPERINFERENCE_API_KEY",
+    env_file: "cheaperinference.env",
+    setup_url: "https://platform.cheaperinference.com",
+    default_model: Some("claude-opus-5"),
+    requires_api_key: true,
+};
+
 pub const ALIBABA_CODING_PLAN_PROFILE: OpenAiCompatibleProfile = OpenAiCompatibleProfile {
     id: "alibaba-coding-plan",
     display_name: "Alibaba Cloud Coding Plan",
@@ -489,7 +500,7 @@ pub const OPENAI_COMPAT_PROFILE: OpenAiCompatibleProfile = OpenAiCompatibleProfi
     requires_api_key: true,
 };
 
-pub(crate) const OPENAI_COMPAT_PROFILES: [OpenAiCompatibleProfile; 42] = [
+pub(crate) const OPENAI_COMPAT_PROFILES: [OpenAiCompatibleProfile; 43] = [
     OPENCODE_PROFILE,
     OPENCODE_GO_PROFILE,
     ZAI_PROFILE,
@@ -497,6 +508,7 @@ pub(crate) const OPENAI_COMPAT_PROFILES: [OpenAiCompatibleProfile; 42] = [
     CHUTES_PROFILE,
     CEREBRAS_PROFILE,
     BELVEDIR_PROFILE,
+    CHEAPERINFERENCE_PROFILE,
     ALIBABA_CODING_PLAN_PROFILE,
     AI302_PROFILE,
     BASETEN_PROFILE,
@@ -764,6 +776,19 @@ pub const BELVEDIR_LOGIN_PROVIDER: LoginProviderDescriptor = LoginProviderDescri
     recommended: false,
     target: LoginProviderTarget::OpenAiCompatible(BELVEDIR_PROFILE),
     order: LoginProviderSurfaceOrder::new(Some(40), Some(40), Some(40), Some(40), Some(40)),
+};
+
+pub const CHEAPERINFERENCE_LOGIN_PROVIDER: LoginProviderDescriptor = LoginProviderDescriptor {
+    id: "cheaperinference",
+    display_name: "Cheaper Inference",
+    auth_kind: LoginProviderAuthKind::ApiKey,
+    auth_state_key: LoginProviderAuthStateKey::OpenRouterLike,
+    auth_status_method: "API key",
+    aliases: &["cheaper-inference", "cheaperinference.com"],
+    menu_detail: "API key, discounted Anthropic and frontier models",
+    recommended: false,
+    target: LoginProviderTarget::OpenAiCompatible(CHEAPERINFERENCE_PROFILE),
+    order: LoginProviderSurfaceOrder::new(Some(41), Some(41), Some(41), Some(41), Some(41)),
 };
 
 pub const ALIBABA_CODING_PLAN_LOGIN_PROVIDER: LoginProviderDescriptor = LoginProviderDescriptor {
@@ -1254,7 +1279,7 @@ pub const GOOGLE_LOGIN_PROVIDER: LoginProviderDescriptor = LoginProviderDescript
     order: LoginProviderSurfaceOrder::new(Some(13), None, None, None, None),
 };
 
-pub(crate) const LOGIN_PROVIDERS: [LoginProviderDescriptor; 54] = [
+pub(crate) const LOGIN_PROVIDERS: [LoginProviderDescriptor; 55] = [
     AUTO_IMPORT_LOGIN_PROVIDER,
     CLAUDE_LOGIN_PROVIDER,
     ANTHROPIC_API_LOGIN_PROVIDER,
@@ -1272,6 +1297,7 @@ pub(crate) const LOGIN_PROVIDERS: [LoginProviderDescriptor; 54] = [
     CHUTES_LOGIN_PROVIDER,
     CEREBRAS_LOGIN_PROVIDER,
     BELVEDIR_LOGIN_PROVIDER,
+    CHEAPERINFERENCE_LOGIN_PROVIDER,
     ALIBABA_CODING_PLAN_LOGIN_PROVIDER,
     AI302_LOGIN_PROVIDER,
     BASETEN_LOGIN_PROVIDER,

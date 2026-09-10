@@ -358,6 +358,7 @@ jcode works with subscription-backed OAuth flows and many provider integrations,
 - **Fireworks** (`jcode login --provider fireworks`)
 - **Novita AI** (`jcode login --provider novita`, API key)
 - **MiniMax** (`jcode login --provider minimax`)
+- **Cheaper Inference** (`jcode login --provider cheaperinference`, API key)
 - **Meta Model API / Muse** (`jcode login --provider meta-muse`)
 - **LM Studio** (`jcode login --provider lmstudio`)
 - **Ollama** (`jcode login --provider ollama`)

@@ -119,6 +119,8 @@ pub enum ProviderChoice {
     Cerebras,
     #[value(alias = "belvedir.ai", alias = "belvedir-ai")]
     Belvedir,
+    #[value(alias = "cheaper-inference", alias = "cheaperinference.com")]
+    Cheaperinference,
     #[value(
         alias = "bailian",
         alias = "aliyun-bailian",
@@ -192,6 +194,7 @@ impl ProviderChoice {
             Self::Chutes => "chutes",
             Self::Cerebras => "cerebras",
             Self::Belvedir => "belvedir",
+            Self::Cheaperinference => "cheaperinference",
             Self::AlibabaCodingPlan => "alibaba-coding-plan",
             Self::OpenaiCompatible => "openai-compatible",
             Self::Cursor => "cursor",
@@ -386,6 +389,10 @@ const PROVIDER_CHOICE_LOGIN_PROVIDERS: &[(ProviderChoice, LoginProviderDescripto
     (
         ProviderChoice::Belvedir,
         crate::provider_catalog::BELVEDIR_LOGIN_PROVIDER,
+    ),
+    (
+        ProviderChoice::Cheaperinference,
+        crate::provider_catalog::CHEAPERINFERENCE_LOGIN_PROVIDER,
     ),
     (
         ProviderChoice::AlibabaCodingPlan,
@@ -1606,6 +1613,7 @@ async fn init_provider_with_options(
         | ProviderChoice::Chutes
         | ProviderChoice::Cerebras
         | ProviderChoice::Belvedir
+        | ProviderChoice::Cheaperinference
         | ProviderChoice::AlibabaCodingPlan
         | ProviderChoice::GeminiApi
         | ProviderChoice::OpenaiCompatible => {
