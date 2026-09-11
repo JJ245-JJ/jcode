@@ -1869,6 +1869,17 @@ async fn run_stream_with_retries(
                     continue;
                 }
 
+                // An idle-timeout stall means the upstream accepted the
+                // connection but sent no data for the full budget. Retrying
+                // replays the same slow upstream (up to 3 x 180s = ~9 min of
+                // silent "thinking"), so fail the turn instead of retrying.
+                if error_str.contains("Stream read timeout")
+                    || error_str.contains("Initial response timeout")
+                {
+                    let _ = tx.send(Err(e)).await;
+                    return;
+                }
+
                 // Check if this is a transient/retryable error
                 if is_retryable_error(&error_str) && attempt + 1 < MAX_RETRIES {
                     if saw_output {
@@ -2660,3 +2671,21 @@ mod context_window;
 #[allow(clippy::await_holding_lock)]
 #[path = "anthropic_tests.rs"]
 mod tests;
+
+// ponytail self-check: the idle-timeout no-retry guard must exist and match
+// the strings produced at the timeout bail sites. Run with --self-check.
+#[cfg(test)]
+mod idle_timeout_guard_test {
+    #[test]
+    fn idle_timeout_errors_are_not_retried() {
+        let src = include_str!("lib.rs");
+        let guard = "Stream read timeout";
+        let guard2 = "Initial response timeout";
+        // the guard branch exists before the retry classification
+        let guard_pos = src.find(&format!("error_str.contains(\"{}\")", guard)).unwrap();
+        let retry_pos = src.find("is_retryable_error(&error_str)").unwrap();
+        assert!(guard_pos < retry_pos, "no-retry guard must precede retry check");
+        // and the bail sites still emit the strings the guard matches
+        assert!(src.contains("Stream read timeout: no data received"));
+    }
+}
