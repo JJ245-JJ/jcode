@@ -76,6 +76,10 @@ const MIN_JUSTIFICATION_LEN: usize = 25;
 
 /// Decide what to do with an assessed command.
 pub fn gate(assessment: &RiskAssessment, justification: &Justification) -> GateOutcome {
+    // Operator override: JCODE_DISABLE_RISK_GATE=1 runs everything as-issued.
+    if crate::gate_disabled() {
+        return GateOutcome::Allow;
+    }
     match assessment.level {
         RiskLevel::Safe | RiskLevel::Low => GateOutcome::Allow,
         RiskLevel::Catastrophic => GateOutcome::Deny {
