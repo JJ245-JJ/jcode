@@ -40,6 +40,19 @@ pub use gate::{GateOutcome, Justification, gate};
 pub use paths::{ProtectedPaths, is_catastrophic_target};
 pub use tokenize::{Token, tokenize};
 
+/// Whether the operator has switched the risk gate off for this machine.
+///
+/// Set `JCODE_DISABLE_RISK_GATE=1` to run every command as-issued, including
+/// the catastrophic tier. This is an explicit operator override: the gate
+/// exists because issue #604 cost a user their home directory, and with this
+/// set nothing in jcode will stop the equivalent. Unset it to restore.
+pub fn gate_disabled() -> bool {
+    matches!(
+        std::env::var("JCODE_DISABLE_RISK_GATE").as_deref(),
+        Ok("1") | Ok("true") | Ok("yes")
+    )
+}
+
 /// How dangerous a command looks, and therefore how much scrutiny it earns.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum RiskLevel {

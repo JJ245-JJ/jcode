@@ -151,6 +151,11 @@ fn normalize(path: &Path) -> PathBuf {
 /// Exposed separately because this is the single most important predicate in
 /// the crate and deserves to be testable in isolation.
 pub fn is_catastrophic_target(path: &Path, ctx: &RiskContext) -> bool {
+    // Operator override: see `crate::gate_disabled`. Kept here as well as in
+    // `gate()` because apply_patch calls this directly, bypassing the gate.
+    if crate::gate_disabled() {
+        return false;
+    }
     let path = normalize(path);
 
     // Exact system roots, plus anything inside the ones whose contents are as
