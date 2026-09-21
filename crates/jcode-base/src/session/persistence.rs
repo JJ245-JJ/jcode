@@ -387,12 +387,17 @@ impl Session {
         // id find no file and silently treat the session as missing.
         // Parent linkage is also explicit state: an empty fork carries only a
         // hidden fork notice but must be loadable when its new client attaches.
+        // So are the debug/canary markers: a headless session created over the
+        // debug socket sets them at creation and is then looked up by id, which
+        // failed with ENOENT while the marker lived only in memory.
         if !self.persist_state.snapshot_exists
             && !self
                 .messages
                 .iter()
                 .any(super::is_visible_conversation_message)
             && !self.saved
+            && !self.is_debug
+            && !self.is_canary
             && self.custom_title.is_none()
             && self.title.is_none()
             && self.parent_id.is_none()
