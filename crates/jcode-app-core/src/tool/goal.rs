@@ -1,4 +1,9 @@
 #![cfg_attr(test, allow(clippy::await_holding_lock))]
+// The initiative tool is intentionally not registered (see the note in
+// `Registry::builtin`), so nothing outside `goal_tests` constructs it. Its
+// implementation and saved data stay intact so it can be restored without a
+// migration; dead-code analysis ignores the `#[cfg(test)]` users.
+#![allow(dead_code)]
 
 use super::{Tool, ToolContext, ToolOutput};
 use crate::bus::{Bus, BusEvent, SidePanelUpdated};
