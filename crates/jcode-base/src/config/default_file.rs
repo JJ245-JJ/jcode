@@ -480,6 +480,7 @@ swarm_max_concurrent_agents = 32
 # learn only through the main agent's explicit memory writes.
 # Env overrides: JCODE_MEMORY_SIDECAR_ENABLED, JCODE_MEMORY_MODEL
 # memory_sidecar_enabled = true
+# (OpenAI defaults to gpt-5.6-luna with reasoning effort "none".)
 # memory_model = "gpt-5.6-luna"
 # Legacy memory_rerank_* and memory_embedding_* settings are accepted for
 # backwards compatibility, but have no effect on Jev recall.
