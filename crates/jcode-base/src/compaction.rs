@@ -245,6 +245,17 @@ impl CompactionManager {
         self
     }
 
+    /// Pin the compaction mode instead of inheriting the user's config.
+    ///
+    /// `new` reads `config().compaction.mode`, so tests that assert
+    /// mode-specific thresholds otherwise pass or fail based on whatever the
+    /// developer running them has in `~/.jcode/config.toml`.
+    pub fn with_mode(mut self, mode: crate::config::CompactionMode) -> Self {
+        self.mode = mode.clone();
+        self.compaction_config.mode = mode;
+        self
+    }
+
     /// Update the token budget (e.g., when model changes)
     pub fn set_budget(&mut self, budget: usize) {
         self.model_token_budget = budget;
