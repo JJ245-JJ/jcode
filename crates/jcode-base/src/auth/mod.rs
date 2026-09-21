@@ -391,18 +391,26 @@ impl AuthStatus {
     }
 
     /// Returns true if at least one provider has usable credentials.
+    ///
+    /// Walks the login-provider catalog rather than the struct's named fields.
+    /// Those fields cover eleven providers; the catalog has roughly fifty, so
+    /// a field-by-field check reported "nothing configured" to a user who had
+    /// just logged in to Cerebras, Groq, or any other OpenAI-compatible
+    /// gateway, and the TUI sent them back to the login screen.
+    ///
+    /// `AutoImport` is deliberately skipped: it reports Available when it
+    /// merely *detects* external credentials the user has not trusted yet, and
+    /// those are not usable until they are imported.
     pub fn has_any_available(&self) -> bool {
-        self.anthropic.state == AuthState::Available
-            || self.jcode == AuthState::Available
-            || self.openai == AuthState::Available
-            || self.openrouter == AuthState::Available
-            || self.azure == AuthState::Available
-            || self.bedrock == AuthState::Available
-            || self.copilot == AuthState::Available
-            || self.antigravity == AuthState::Available
-            || self.gemini == AuthState::Available
-            || self.cursor == AuthState::Available
-            || self.grok_build == AuthState::Available
+        crate::provider_catalog::login_providers()
+            .iter()
+            .filter(|provider| {
+                !matches!(
+                    provider.target,
+                    crate::provider_catalog::LoginProviderTarget::AutoImport
+                )
+            })
+            .any(|provider| self.state_for_provider(*provider) == AuthState::Available)
             || self.openai_compatible_any == AuthState::Available
     }
 
