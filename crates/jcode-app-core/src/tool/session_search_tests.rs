@@ -322,9 +322,19 @@ fn system_reminders_are_hidden_by_default_and_opt_in_searchable() {
             vec![text("display-role-needle")],
             Some(StoredDisplayRole::System),
         );
+        // `save` deliberately skips sessions that hold nothing but system
+        // messages, so a system-only transcript never reaches disk and this
+        // test would search an empty directory. Add one ordinary message to
+        // make the session persist; the assertions below still prove the
+        // system messages themselves are filtered.
+        session.add_message(Role::User, vec![text("ordinary-visible-needle")]);
         session.save().expect("save system session");
 
         let options = SearchOptions::for_test("current-session");
+        assert!(
+            !run_search(home, "ordinary-visible-needle", &options).is_empty(),
+            "the session must be on disk for the filter assertions to mean anything"
+        );
         assert!(run_search(home, "secret-system-needle", &options).is_empty());
         assert!(run_search(home, "display-role-needle", &options).is_empty());
 
