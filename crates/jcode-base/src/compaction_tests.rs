@@ -76,7 +76,9 @@ fn test_restored_messages_do_not_trigger_compaction_immediately() {
 
 #[test]
 fn test_new_message_after_restore_reenables_compaction() {
-    let mut manager = CompactionManager::new().with_budget(1_000);
+    let mut manager = CompactionManager::new()
+        .with_mode(crate::config::CompactionMode::Reactive)
+        .with_budget(1_000);
     let mut messages = Vec::new();
     for i in 0..20 {
         messages.push(make_text_message(Role::User, &format!("restored {}", i)));
@@ -106,7 +108,9 @@ fn test_token_estimate() {
 
 #[test]
 fn test_should_compact() {
-    let mut manager = CompactionManager::new().with_budget(100); // Very small budget
+    let mut manager = CompactionManager::new()
+        .with_mode(crate::config::CompactionMode::Reactive)
+        .with_budget(100);
 
     let mut messages = Vec::new();
     for i in 0..20 {
@@ -133,7 +137,9 @@ fn test_context_usage_prefers_observed_tokens() {
 
 #[test]
 fn test_should_compact_uses_observed_tokens() {
-    let mut manager = CompactionManager::new().with_budget(1_000);
+    let mut manager = CompactionManager::new()
+        .with_mode(crate::config::CompactionMode::Reactive)
+        .with_budget(1_000);
 
     let mut messages = Vec::new();
     for _ in 0..12 {
@@ -234,7 +240,9 @@ async fn test_guard_below_80_does_nothing() {
 
 #[tokio::test]
 async fn test_guard_between_80_and_95_starts_background_only() {
-    let mut manager = CompactionManager::new().with_budget(1_000);
+    let mut manager = CompactionManager::new()
+        .with_mode(crate::config::CompactionMode::Reactive)
+        .with_budget(1_000);
     let mut messages = Vec::new();
     for i in 0..20 {
         messages.push(make_text_message(Role::User, &format!("msg {}", i)));
@@ -270,7 +278,9 @@ async fn test_guard_between_80_and_95_starts_background_only() {
 /// live messages (observed as "kept 0 recent messages").
 #[tokio::test]
 async fn test_hard_compact_aborts_inflight_background_compaction() {
-    let mut manager = CompactionManager::new().with_budget(1_000);
+    let mut manager = CompactionManager::new()
+        .with_mode(crate::config::CompactionMode::Reactive)
+        .with_budget(1_000);
     let mut messages = Vec::new();
     for i in 0..30 {
         messages.push(make_text_message(
@@ -337,7 +347,9 @@ async fn test_hard_compact_aborts_inflight_background_compaction() {
 /// live tail. The stale result should be discarded instead.
 #[tokio::test]
 async fn test_stale_background_result_discarded_when_context_shrinks() {
-    let mut manager = CompactionManager::new().with_budget(1_000);
+    let mut manager = CompactionManager::new()
+        .with_mode(crate::config::CompactionMode::Reactive)
+        .with_budget(1_000);
     let mut messages = Vec::new();
     for i in 0..30 {
         messages.push(make_text_message(
