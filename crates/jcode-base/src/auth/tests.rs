@@ -188,13 +188,20 @@ fn full_and_fast_auth_status_match_for_shared_probe_fields() {
 
 #[cfg(unix)]
 #[test]
-fn full_and_fast_auth_status_document_cursor_cli_exception() {
+fn full_and_fast_auth_status_document_cursor_vscdb_exception() {
     let _lock = crate::storage::lock_test_env();
     let temp = tempfile::TempDir::new().expect("create temp dir");
     let home = temp.path().join("home");
     let xdg = temp.path().join("xdg");
+    let jcode_home = temp.path().join("jcode-home");
+    // `user_home_path` redirects external credential lookups under
+    // `$JCODE_HOME/external`, so the mock Cursor storage has to live there.
+    let vscdb_dir = jcode_home
+        .join("external")
+        .join("Library/Application Support/Cursor/User/globalStorage");
     std::fs::create_dir_all(&home).expect("create temp home");
     std::fs::create_dir_all(&xdg).expect("create temp xdg config");
+    std::fs::create_dir_all(&vscdb_dir).expect("create temp cursor storage");
     let saved = [
         "JCODE_HOME",
         "XDG_CONFIG_HOME",
@@ -202,34 +209,55 @@ fn full_and_fast_auth_status_document_cursor_cli_exception() {
         "CURSOR_API_KEY",
         "CURSOR_ACCESS_TOKEN",
         "CURSOR_REFRESH_TOKEN",
-        "JCODE_CURSOR_CLI_PATH",
     ]
     .into_iter()
     .map(|key| (key, std::env::var_os(key)))
     .collect::<Vec<_>>();
-    let mock_cli = write_mock_cursor_agent(
-        temp.path(),
-        "#!/bin/sh\nif [ \"$1\" = \"status\" ]; then\n  echo \"Authenticated\\nAccount: test@example.com\"\n  exit 0\nfi\nexit 1\n",
-    );
 
-    crate::env::set_var("JCODE_HOME", temp.path().join("jcode-home"));
+    crate::env::set_var("JCODE_HOME", &jcode_home);
     crate::env::set_var("XDG_CONFIG_HOME", &xdg);
     crate::env::set_var("HOME", &home);
     crate::env::remove_var("CURSOR_API_KEY");
     crate::env::remove_var("CURSOR_ACCESS_TOKEN");
     crate::env::remove_var("CURSOR_REFRESH_TOKEN");
-    crate::env::set_var("JCODE_CURSOR_CLI_PATH", &mock_cli);
+
+    // The only Cursor credential in this sandbox lives in Cursor IDE's
+    // state.vscdb. Full probes it; fast deliberately does not.
+    let db_path = vscdb_dir.join("state.vscdb");
+    let created = std::process::Command::new("sqlite3")
+        .arg(&db_path)
+        .arg(
+            "CREATE TABLE ItemTable (key TEXT UNIQUE ON CONFLICT REPLACE, value BLOB);\
+             INSERT INTO ItemTable (key, value) VALUES ('cursorAuth/accessToken', 'at-vscdb');",
+        )
+        .status();
+    let have_sqlite = matches!(created, Ok(status) if status.success());
+    if have_sqlite {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&db_path, std::fs::Permissions::from_mode(0o600))
+            .expect("tighten mock vscdb permissions");
+        crate::config::Config::allow_external_auth_source_for_path(
+            crate::auth::cursor::CURSOR_VSCDB_SOURCE_ID,
+            &db_path,
+        )
+        .expect("trust mock cursor vscdb");
+    }
     AuthStatus::invalidate_cache();
 
     let (full, _) = build_auth_status_uncached(AuthProbeMode::Full);
     let (fast, _) = build_auth_status_uncached(AuthProbeMode::Fast);
 
-    assert_eq!(full.cursor, AuthState::Available);
-    assert_eq!(fast.cursor, AuthState::NotConfigured);
+    if have_sqlite {
+        assert_eq!(
+            full.cursor,
+            AuthState::Available,
+            "full auth reads Cursor's state.vscdb"
+        );
+    }
     assert_eq!(
-        full.cursor,
-        AuthState::Available,
-        "Full auth probes cursor-agent status; fast auth intentionally skips CLI/vscdb probes"
+        fast.cursor,
+        AuthState::NotConfigured,
+        "fast auth intentionally skips the vscdb probe"
     );
 
     for (key, value) in saved {
