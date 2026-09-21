@@ -327,6 +327,10 @@ fn system_reminders_are_hidden_by_default_and_opt_in_searchable() {
         session.save_prepared().expect("save system session");
 
         let options = SearchOptions::for_test("current-session");
+        assert!(
+            !run_search(home, "ordinary-visible-needle", &options).is_empty(),
+            "the session must be on disk for the filter assertions to mean anything"
+        );
         assert!(run_search(home, "secret-system-needle", &options).is_empty());
         assert!(run_search(home, "display-role-needle", &options).is_empty());
 
