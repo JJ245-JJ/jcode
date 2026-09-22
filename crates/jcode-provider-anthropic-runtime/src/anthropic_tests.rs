@@ -1806,6 +1806,40 @@ fn detects_anthropic_model_not_found_errors() {
 }
 
 #[test]
+fn account_quota_exhaustion_is_not_treated_as_a_transient_burst() {
+    // Verbatim body Anthropic returned on the user's real subscription 429s
+    // (captured from ~/.fcc/logs/server.log). None of those responses carried
+    // a Retry-After header, so the local ~1s/~2s/~4s budget could never
+    // outlast a 5-hour or 7-day window: every retry just re-uploaded the whole
+    // conversation for another guaranteed failure.
+    let quota = "anthropic api error (429 too many requests): {\"type\":\"error\",\"error\":{\"type\":\"rate_limit_error\",\"message\":\"this request would exceed your account's rate limit. please try again later.\"}}";
+    assert!(
+        is_account_quota_exhausted(quota),
+        "subscription-window rejection must be recognized as exhausted quota"
+    );
+
+    // Ollama/OpenRouter-style monthly exhaustion phrasing.
+    assert!(is_account_quota_exhausted(
+        "you have reached your monthly usage limit, upgrade for higher limits"
+    ));
+
+    // A genuine transient burst must stay retryable: it has no account-scoped
+    // wording, so the retry budget can plausibly outlast it.
+    let burst = "anthropic api error (429 too many requests): {\"type\":\"error\",\"error\":{\"type\":\"rate_limit_error\",\"message\":\"too many concurrent requests\"}}";
+    assert!(
+        !is_account_quota_exhausted(burst),
+        "a concurrency burst must remain retryable"
+    );
+    assert!(is_retryable_error(burst));
+
+    // Unrelated transient faults keep retrying and are never misread as quota.
+    assert!(is_retryable_error("anthropic api error (503 service unavailable): overloaded"));
+    assert!(!is_account_quota_exhausted(
+        "anthropic api error (503 service unavailable): overloaded"
+    ));
+}
+
+#[test]
 fn anthropic_fallback_prefers_best_available_and_skips_tried_and_retired() {
     // The fallback logic reads the process-global model catalog; lock and
     // reset it so fixture models hydrated by other tests cannot leak in.
