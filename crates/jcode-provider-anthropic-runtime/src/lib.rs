@@ -1927,8 +1927,20 @@ async fn run_stream_with_retries(
                     continue;
                 }
 
-                // Check if this is a transient/retryable error
-                if is_retryable_error(&error_str) && attempt + 1 < MAX_RETRIES {
+                // Check if this is a transient/retryable error.
+                //
+                // An exhausted account quota is the exception: its window is
+                // hours or days away, so burning the retry budget on it only
+                // re-uploads the whole conversation for guaranteed failures.
+                // A server `Retry-After` hint overrides the heuristic, since
+                // the server is then telling us the wait really is bounded.
+                let server_hint = jcode_provider_core::retry_after::retry_after_from_error(&e);
+                let quota_exhausted =
+                    is_account_quota_exhausted(&error_str) && server_hint.is_none();
+                if is_retryable_error(&error_str)
+                    && !quota_exhausted
+                    && attempt + 1 < MAX_RETRIES
+                {
                     if saw_output {
                         // The fault hit mid-stream after partial output reached
                         // the consumer. Tell it to discard the partial attempt
@@ -1947,9 +1959,15 @@ async fn run_stream_with_retries(
                     } else {
                         jcode_base::logging::info(&format!("Transient error, will retry: {}", e));
                     }
-                    next_retry_delay = jcode_provider_core::retry_after::retry_after_from_error(&e);
+                    next_retry_delay = server_hint;
                     last_error = Some(e);
                     continue;
+                }
+                if quota_exhausted {
+                    jcode_base::logging::warn(&format!(
+                        "Account quota exhausted; not retrying (the limit window outlasts the retry budget): {}",
+                        e
+                    ));
                 }
 
                 // Non-retryable or final attempt
@@ -2227,7 +2245,30 @@ async fn stream_response(
     Ok(())
 }
 
-/// Check if an error is transient and should be retried
+/// Detect a 429 that reflects an exhausted account quota rather than a
+/// transient burst.
+///
+/// Anthropic returns the same `rate_limit_error` type for both, but the
+/// subscription-window rejection says the request "would exceed your account's
+/// rate limit". That window is measured in hours or days, so the local retry
+/// budget (~1s, ~2s, ~4s) can never outlast it. Retrying only re-uploads the
+/// whole conversation for three more guaranteed failures.
+///
+/// A server `Retry-After` hint takes priority over this heuristic and is
+/// honored by the caller, so this only governs the hintless case.
+/// `error_str` is expected to already be lowercased.
+fn is_account_quota_exhausted(error_str: &str) -> bool {
+    error_str.contains("exceed your account")
+        || error_str.contains("usage limit")
+        || error_str.contains("usage_limit")
+        || error_str.contains("quota")
+}
+
+/// Check if an error is transient and should be retried.
+///
+/// Account-quota exhaustion is classified separately by
+/// [`is_account_quota_exhausted`] at the call site, because that decision also
+/// depends on whether the server supplied a `Retry-After` hint.
 fn is_retryable_error(error_str: &str) -> bool {
     jcode_provider_core::is_transient_transport_error(error_str)
         // Server errors (5xx)
