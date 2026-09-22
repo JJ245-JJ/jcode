@@ -8,9 +8,39 @@ impl Config {
         jcode_dir().ok().map(|d| d.join("config.toml"))
     }
 
+    /// Built-in `fcc` provider profile (Free Claude Code local proxy).
+    ///
+    /// Seeded at load time so the route works on a machine with no
+    /// `[providers.fcc]` block. A user-defined `fcc` in config.toml always wins.
+    fn builtin_fcc_provider() -> NamedProviderConfig {
+        NamedProviderConfig {
+            provider_type: NamedProviderType::AnthropicCompatible,
+            base_url: "http://127.0.0.1:8082/v1".to_string(),
+            auth: NamedProviderAuth::Bearer,
+            api_key_env: Some("JCODE_PROVIDER_FCC_API_KEY".to_string()),
+            env_file: Some("provider-fcc.env".to_string()),
+            default_model: Some("claude-opus-5".to_string()),
+            models: vec![NamedProviderModelConfig {
+                id: "claude-opus-5".to_string(),
+                reasoning: Some(true),
+                context_window: Some(262_144),
+                ..Default::default()
+            }],
+            ..Default::default()
+        }
+    }
+
+    /// Add built-in provider profiles the user has not defined themselves.
+    fn seed_builtin_providers(&mut self) {
+        self.providers
+            .entry("fcc".to_string())
+            .or_insert_with(Self::builtin_fcc_provider);
+    }
+
     /// Load config from file, with environment variable overrides
     pub fn load() -> Self {
         let mut config = Self::load_from_file().unwrap_or_default();
+        config.seed_builtin_providers();
         config.apply_env_overrides();
         config
     }
@@ -21,6 +51,7 @@ impl Config {
     /// to distinguish a malformed config from an absent config.
     pub fn load_strict() -> anyhow::Result<Self> {
         let mut config = Self::load_from_file_strict()?.unwrap_or_default();
+        config.seed_builtin_providers();
         config.apply_env_overrides();
         Ok(config)
     }
@@ -723,7 +754,7 @@ impl Config {
 
 #[cfg(test)]
 mod issue_1056_tests {
-    use super::Config;
+    use super::{Config, NamedProviderType};
 
     struct EnvGuard {
         key: &'static str,
@@ -802,5 +833,31 @@ reasoning_effort = "max"
 
         assert!(error.to_string().contains("Failed to parse config file"));
         assert_eq!(std::fs::read_to_string(path).unwrap(), original);
+    }
+
+    #[test]
+    fn fcc_is_built_in_without_config_and_user_config_still_wins() {
+        let _lock = crate::storage::lock_test_env();
+        let home = tempfile::tempdir().unwrap();
+        let _home = EnvGuard::set("JCODE_HOME", home.path());
+
+        // No config.toml at all: fcc must still be routable.
+        let seeded = Config::load();
+        let fcc = seeded.providers.get("fcc").expect("fcc must be built in");
+        assert_eq!(fcc.base_url, "http://127.0.0.1:8082/v1");
+        assert_eq!(fcc.provider_type, NamedProviderType::AnthropicCompatible);
+        assert_eq!(fcc.default_model.as_deref(), Some("claude-opus-5"));
+
+        // A user-defined fcc overrides the built-in rather than being clobbered.
+        std::fs::write(
+            home.path().join("config.toml"),
+            "[providers.fcc]\ntype = \"anthropic-compatible\"\nbase_url = \"http://127.0.0.1:9999/v1\"\n",
+        )
+        .unwrap();
+        let overridden = Config::load();
+        assert_eq!(
+            overridden.providers["fcc"].base_url,
+            "http://127.0.0.1:9999/v1"
+        );
     }
 }
