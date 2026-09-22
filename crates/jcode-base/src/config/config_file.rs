@@ -20,12 +20,27 @@ impl Config {
             api_key_env: Some("JCODE_PROVIDER_FCC_API_KEY".to_string()),
             env_file: Some("provider-fcc.env".to_string()),
             default_model: Some("claude-opus-5".to_string()),
-            models: vec![NamedProviderModelConfig {
-                id: "claude-opus-5".to_string(),
-                reasoning: Some(true),
-                context_window: Some(262_144),
-                ..Default::default()
-            }],
+            models: vec![
+                NamedProviderModelConfig {
+                    id: "claude-opus-5".to_string(),
+                    reasoning: Some(true),
+                    context_window: Some(262_144),
+                    ..Default::default()
+                },
+                // Opus 5.5 is only reachable through the proxy's fully
+                // qualified `<format>/<backend>/<model>` id. The proxy does not
+                // list a bare `claude-opus-5-5`, and a bare unknown
+                // `claude-opus-*` id is silently served as `claude-opus-5`
+                // (verified live: bare `claude-opus-9-9` also answers as
+                // `claude-opus-5`), so a bare entry here would look like it
+                // worked while quietly running the older model.
+                NamedProviderModelConfig {
+                    id: "anthropic/anthropic_oauth/claude-opus-5-5".to_string(),
+                    reasoning: Some(true),
+                    context_window: Some(262_144),
+                    ..Default::default()
+                },
+            ],
             ..Default::default()
         }
     }
@@ -854,6 +869,15 @@ reasoning_effort = "max"
         assert_eq!(fcc.base_url, "http://127.0.0.1:8082/v1");
         assert_eq!(fcc.provider_type, NamedProviderType::AnthropicCompatible);
         assert_eq!(fcc.default_model.as_deref(), Some("claude-opus-5"));
+        // Opus 5.5 is routable out of the box, under the fully qualified id the
+        // proxy actually serves (a bare `claude-opus-5-5` silently answers as
+        // `claude-opus-5`).
+        assert!(
+            fcc.models
+                .iter()
+                .any(|model| model.id == "anthropic/anthropic_oauth/claude-opus-5-5"),
+            "fcc must expose Opus 5.5 via its qualified proxy id"
+        );
 
         // A user-defined fcc overrides the built-in rather than being clobbered.
         std::fs::write(
