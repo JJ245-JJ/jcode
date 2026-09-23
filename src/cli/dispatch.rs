@@ -681,10 +681,8 @@ fn resolve_resume_arg(args: &mut Args) -> Result<()> {
                         // Leave args.resume as the raw id for the server to resolve.
                     }
                     ResumeResolutionFailureAction::Exit => {
-                        eprintln!("Error: {}", e);
-                        if !output::quiet_enabled() {
-                            eprintln!("\nUse `jcode --resume` to list available sessions.");
-                        }
+                        output::stderr_error(format!("Error: {}", e));
+                        output::stderr_info("\nUse `jcode --resume` to list available sessions.");
                         std::process::exit(1);
                     }
                 }

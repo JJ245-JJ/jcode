@@ -27,6 +27,12 @@ pub fn stderr_info(message: impl AsRef<str>) {
     }
 }
 
+/// Like `stderr_info` but not suppressed by quiet mode (errors always print).
+pub fn stderr_error(message: impl AsRef<str>) {
+    use std::io::Write;
+    let _ = writeln!(std::io::stderr(), "{}", message.as_ref());
+}
+
 pub fn terminal_title(title: impl AsRef<str>) -> String {
     crate::output_style::terminal_text(title.as_ref()).into_owned()
 }

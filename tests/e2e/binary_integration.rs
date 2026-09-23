@@ -130,6 +130,28 @@ async fn binary_version_command() -> Result<()> {
     Ok(())
 }
 
+/// Error reporting must not panic when stderr is closed (detached helpers such
+/// as the macOS notification broker): eprintln! panics on EPIPE -> exit 101.
+#[cfg(unix)]
+#[tokio::test]
+async fn binary_error_exit_survives_closed_stderr() -> Result<()> {
+    use std::os::fd::OwnedFd;
+    use std::process::{Command, Stdio};
+    let _env = setup_test_env()?;
+
+    let (reader, writer) = std::io::pipe()?;
+    drop(reader);
+    let status = Command::new(env!("CARGO_BIN_EXE_jcode"))
+        .args(["--resume", "definitely-not-a-session"])
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::from(OwnedFd::from(writer)))
+        .status()?;
+
+    assert_eq!(status.code(), Some(1), "expected a clean error exit, got {status:?}");
+    Ok(())
+}
+
 /// Test full server reload handoff against a real spawned server process.
 ///
 /// Requires a built release binary at target/release/jcode because the reload

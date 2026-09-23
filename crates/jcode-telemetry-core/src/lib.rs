@@ -2584,13 +2584,13 @@ fn show_first_run_notice() {
     } else {
         ("", "")
     };
-    eprintln!("{dim}");
-    eprintln!("  jcode collects anonymous usage statistics (install count, version, OS,");
-    eprintln!("  session activity, tool counts, and crash/exit reasons). No code, filenames,");
-    eprintln!("  prompts, or personal data is sent.");
-    eprintln!("  To opt out: export JCODE_NO_TELEMETRY=1");
-    eprintln!("  Details: https://github.com/1jehuang/jcode/blob/master/TELEMETRY.md");
-    eprintln!("{reset}");
+    // Ignore write errors: eprintln! panics when stderr is closed (launchd
+    // helpers), which turned first launch into exit 101.
+    use std::io::Write;
+    let _ = write!(
+        std::io::stderr(),
+        "{dim}\n  jcode collects anonymous usage statistics (install count, version, OS,\n  session activity, tool counts, and crash/exit reasons). No code, filenames,\n  prompts, or personal data is sent.\n  To opt out: export JCODE_NO_TELEMETRY=1\n  Details: https://github.com/1jehuang/jcode/blob/master/TELEMETRY.md\n{reset}\n"
+    );
 }
 
 #[cfg(test)]
