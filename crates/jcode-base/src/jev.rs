@@ -818,6 +818,13 @@ mod tests {
                         Err(error) => panic!("accept: {error}"),
                     }
                 };
+                // The accepted socket inherits the listener's O_NONBLOCK on
+                // macOS/BSD, so `read` returns WouldBlock the moment the client
+                // has not written yet and `set_read_timeout` never applies.
+                // That surfaced as a flaky unwrap panic whenever this test ran
+                // alongside others. Put the stream back in blocking mode and
+                // let the read timeout bound it.
+                stream.set_nonblocking(false).unwrap();
                 stream
                     .set_read_timeout(Some(Duration::from_secs(5)))
                     .unwrap();
