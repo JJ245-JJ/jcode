@@ -14,9 +14,16 @@ pub fn quiet_enabled() -> bool {
         .unwrap_or(false)
 }
 
+// Write errors are ignored: eprintln! panics when stderr is closed (detached
+// notification broker), turning an error report into a SIGABRT crash.
 pub fn stderr_info(message: impl AsRef<str>) {
     if !quiet_enabled() {
-        eprintln!("{}", crate::output_style::terminal_text(message.as_ref()));
+        use std::io::Write;
+        let _ = writeln!(
+            std::io::stderr(),
+            "{}",
+            crate::output_style::terminal_text(message.as_ref())
+        );
     }
 }
 
@@ -26,6 +33,7 @@ pub fn terminal_title(title: impl AsRef<str>) -> String {
 
 pub fn stderr_blank_line() {
     if !quiet_enabled() {
-        eprintln!();
+        use std::io::Write;
+        let _ = writeln!(std::io::stderr());
     }
 }
