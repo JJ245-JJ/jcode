@@ -27,7 +27,22 @@ use std::sync::{Mutex, MutexGuard, OnceLock};
 #[cfg(any(test, feature = "test-support"))]
 pub fn test_env_lock() -> &'static Mutex<()> {
     static ENV_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
-    ENV_LOCK.get_or_init(|| Mutex::new(()))
+    ENV_LOCK.get_or_init(|| {
+        // Running `cargo test` from inside a jcode session inherits that
+        // session's active-provider env, which silently re-routes provider
+        // resolution in tests that never set it. Scrub it once, up front.
+        for key in [
+            "JCODE_NAMED_PROVIDER_PROFILE",
+            "JCODE_PROVIDER_PROFILE_ACTIVE",
+            "JCODE_PROVIDER_PROFILE_NAME",
+            "JCODE_ACTIVE_PROVIDER",
+            "JCODE_RUNTIME_PROVIDER",
+            "ANTHROPIC_AUTH_TOKEN",
+        ] {
+            crate::env::remove_var(key);
+        }
+        Mutex::new(())
+    })
 }
 
 #[cfg(any(test, feature = "test-support"))]
