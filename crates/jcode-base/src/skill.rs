@@ -327,16 +327,33 @@ impl SkillRegistry {
         working_dir.map(|dir| dir.join(&path)).unwrap_or(path)
     }
 
+    /// True when a project-local dir is really one of the global dirs that
+    /// `load_global` already loaded (workspace root == home). Re-parsing it on
+    /// every overlay read cost ~100ms per TUI header rebuild with ~250 skills.
+    fn is_global_skills_dir(dir: &Path) -> bool {
+        let globals = [
+            crate::storage::jcode_dir().map(|d| d.join("skills")),
+            crate::storage::user_home_path(".agents/skills"),
+        ];
+        let Ok(dir) = std::fs::canonicalize(dir) else {
+            return false;
+        };
+        globals
+            .into_iter()
+            .flatten()
+            .any(|g| std::fs::canonicalize(g).is_ok_and(|g| g == dir))
+    }
+
     fn load_project_local_dirs(&mut self, working_dir: Option<&Path>) -> Result<()> {
         // Load from ./.jcode/skills/ (project-local jcode skills)
         let local_jcode = Self::project_local_dir(working_dir, ".jcode");
-        if local_jcode.exists() {
+        if local_jcode.exists() && !Self::is_global_skills_dir(&local_jcode) {
             self.load_from_dir(&local_jcode)?;
         }
 
         // Load from ./.agents/skills/ (shared cross-tool `.agents` convention)
         let local_agents = Self::project_local_dir(working_dir, ".agents");
-        if local_agents.exists() {
+        if local_agents.exists() && !Self::is_global_skills_dir(&local_agents) {
             self.load_from_dir(&local_agents)?;
         }
 
@@ -1287,6 +1304,27 @@ mod tests {
             skill.path.starts_with(temp.path()),
             "project-local overlay must win over a same-named global skill"
         );
+    }
+
+    #[test]
+    fn overlay_skips_global_dir_when_workspace_is_jcode_home_parent() {
+        let _env_guard = crate::storage::lock_test_env();
+        let temp = tempfile::tempdir().expect("tempdir");
+        let jcode_home = temp.path().join(".jcode");
+        write_test_skill(temp.path(), ".jcode", "global-skill");
+        write_test_skill(temp.path(), ".claude", "claude-skill");
+        let prev = std::env::var_os("JCODE_HOME");
+        crate::env::set_var("JCODE_HOME", &jcode_home);
+        let overlay = SkillRegistry::load_project_overlay(Some(temp.path()));
+        match prev {
+            Some(v) => crate::env::set_var("JCODE_HOME", v),
+            None => crate::env::remove_var("JCODE_HOME"),
+        }
+        let overlay = overlay.expect("load overlay");
+        // ~/.jcode/skills is global; re-parsing it per overlay read made every
+        // TUI header rebuild in $HOME cost ~100ms.
+        assert!(overlay.get("global-skill").is_none());
+        assert!(overlay.get("claude-skill").is_some());
     }
 
     #[test]
