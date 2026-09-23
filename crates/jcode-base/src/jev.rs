@@ -65,7 +65,7 @@ impl JevPurpose {
     fn selector_with(
         self,
         env: impl FnOnce(&str) -> Result<String, std::env::VarError>,
-        memory_default: impl FnOnce() -> String,
+        config_default: impl FnOnce() -> String,
     ) -> Result<String> {
         let key = match self {
             Self::Memory => PROVIDER_ENV,
@@ -74,10 +74,10 @@ impl JevPurpose {
         };
         match env(key) {
             Ok(value) => Ok(value),
+            // Voice is pinned to its own auto route; only memory/browser read config.
             Err(std::env::VarError::NotPresent) => Ok(match self {
-                Self::Memory => memory_default(),
-                Self::Browser => "auto".into(),
                 Self::Voice => "auto".into(),
+                Self::Memory | Self::Browser => config_default(),
             }),
             Err(_) => bail!("{key} must contain a valid provider name"),
         }
@@ -89,6 +89,7 @@ enum JevProvider {
     OpenRouter,
     TypeSafe,
     Aimlapi,
+    Vercel,
     Jcode,
 }
 
@@ -98,6 +99,7 @@ impl JevProvider {
             Self::OpenRouter => "openrouter",
             Self::TypeSafe => "typesafe",
             Self::Aimlapi => "aimlapi",
+            Self::Vercel => "vercel",
             Self::Jcode => "jcode",
         }
     }
@@ -107,6 +109,7 @@ impl JevProvider {
             Self::OpenRouter => ("OPENROUTER_API_KEY", "openrouter.env"),
             Self::TypeSafe => ("TYPESAFE_API_KEY", "typesafe.env"),
             Self::Aimlapi => ("AIMLAPI_API_KEY", "aimlapi.env"),
+            Self::Vercel => ("AI_GATEWAY_API_KEY", "vercel-ai-gateway.env"),
             Self::Jcode => (
                 crate::subscription_catalog::JCODE_API_KEY_ENV,
                 crate::subscription_catalog::JCODE_ENV_FILE,
@@ -126,6 +129,7 @@ impl JevProvider {
             Self::OpenRouter | Self::Jcode => "typesafe/jev-1.13",
             Self::TypeSafe => "jev-latest",
             Self::Aimlapi => "typesafe/jev",
+            Self::Vercel => "typesafe-ai/jev",
         }
     }
 
@@ -134,6 +138,8 @@ impl JevProvider {
             Self::OpenRouter => "https://openrouter.ai/api/alpha/decisions".into(),
             Self::TypeSafe => "https://api.typesafe.ai/v1/systemone".into(),
             Self::Aimlapi => "https://api.aimlapi.com/v1/decisions".into(),
+            // AI SDK gateway protocol, as used by `experimental_evaluate`.
+            Self::Vercel => "https://ai-gateway.vercel.sh/v4/ai/evaluation-model".into(),
             Self::Jcode => format!("{}/decisions", trusted_gateway_base(gateway_base)?),
         })
     }
@@ -208,7 +214,14 @@ impl JevClient {
     fn resolve(purpose: JevPurpose) -> Result<(JevProvider, String, String, Option<String>)> {
         let selector = purpose.selector_with(
             |key| std::env::var(key),
-            || crate::config::config().agents.memory_jev_provider.clone(),
+            || {
+                let agents = &crate::config::config().agents;
+                match purpose {
+                    JevPurpose::Memory => agents.memory_jev_provider.clone(),
+                    JevPurpose::Browser => agents.browser_jev_provider.clone(),
+                    JevPurpose::Voice => unreachable!("voice ignores config"),
+                }
+            },
         )?;
         // Unlike the API-key helper, this does not consult registered
         // cross-provider fallback resolvers or the shared compatible slot.
@@ -280,7 +293,10 @@ impl JevClient {
         if self.purpose == JevPurpose::Voice {
             return self.send_hedged(body, &questions).await;
         }
-        let value = self.send(&self.endpoint, body).await?;
+        let mut value = self.send(&self.endpoint, body).await?;
+        if self.provider == JevProvider::Vercel {
+            value = from_vercel(value);
+        }
         validate_answers(&value, &questions)?;
         Ok(value)
     }
@@ -382,6 +398,13 @@ impl JevClient {
                 },
             );
         }
+        if self.provider == JevProvider::Vercel {
+            request = request
+                .header("ai-gateway-protocol-version", "0.0.1")
+                .header("ai-gateway-auth-method", "api-key")
+                .header("ai-evaluation-model-specification-version", "4")
+                .header("ai-model-id", self.provider.model());
+        }
         request.send().await.map_err(|_| {
             anyhow!("Jev decision request failed or timed out; check the selected provider")
         })
@@ -453,12 +476,16 @@ fn resolve_with(
             JevProvider::TypeSafe,
             JevProvider::OpenRouter,
             JevProvider::Aimlapi,
+            JevProvider::Vercel,
         ],
         "openrouter" => &[JevProvider::OpenRouter],
         "typesafe" => &[JevProvider::TypeSafe],
         "aimlapi" => &[JevProvider::Aimlapi],
+        "vercel" | "ai-gateway" | "vercel-ai-gateway" => &[JevProvider::Vercel],
         "jcode" | "subscription" | "jcode-subscription" => &[JevProvider::Jcode],
-        _ => bail!("Invalid Jev provider. Choose auto, openrouter, typesafe, aimlapi, or jcode"),
+        _ => bail!(
+            "Invalid Jev provider. Choose auto, openrouter, typesafe, aimlapi, vercel, or jcode"
+        ),
     };
     resolve_providers(providers, load)
 }
@@ -609,9 +636,24 @@ fn request_body_for(
         } else {
             state
         };
-    let body = serde_json::to_vec(&json!({
-        "model": provider.model(), "state": state, "questions": questions
-    }))
+    let body = if provider == JevProvider::Vercel {
+        // The gateway names the model in a header and calls noul "boolean".
+        let questions: Map<String, Value> = questions
+            .iter()
+            .map(|(id, q)| {
+                let mut q = q.clone();
+                if q["type"] == "noul" {
+                    q["type"] = json!("boolean");
+                }
+                (id.clone(), q)
+            })
+            .collect();
+        serde_json::to_vec(&json!({"state": state, "questions": questions}))
+    } else {
+        serde_json::to_vec(&json!({
+            "model": provider.model(), "state": state, "questions": questions
+        }))
+    }
     .map_err(|_| anyhow!("Could not encode Jev request"))?;
     ensure!(
         body.len() <= MAX_REQUEST_BYTES,
@@ -700,6 +742,27 @@ async fn read_response(
     }
     // Never retain serde's diagnostic, which can quote untrusted response data.
     serde_json::from_slice(&bytes).map_err(|_| anyhow!("Jev returned invalid response JSON"))
+}
+
+/// Map the gateway's AI SDK answer shape back onto the Decisions shape callers
+/// read: boolean `probability` becomes `noul`, and per-question confidence moves
+/// from `providerMetadata.typesafe.confidence` onto the answer.
+fn from_vercel(mut value: Value) -> Value {
+    let confidence = value
+        .pointer("/providerMetadata/typesafe/confidence")
+        .cloned();
+    if let Some(answers) = value["answers"].as_object_mut() {
+        for (id, answer) in answers.iter_mut() {
+            if answer["type"] == "boolean" {
+                *answer = json!({"type": "noul", "noul": answer["probability"].clone()});
+            } else if let Some(c) = confidence.as_ref().and_then(|c| c.get(id))
+                && answer.get("confidence").is_none()
+            {
+                answer["confidence"] = c.clone();
+            }
+        }
+    }
+    value
 }
 
 fn validate_answers(value: &Value, questions: &Map<String, Value>) -> Result<()> {
@@ -844,7 +907,7 @@ mod tests {
                     assert_eq!(key, BROWSER_PROVIDER_ENV);
                     Err(std::env::VarError::NotPresent)
                 },
-                || panic!("browser must not consult memory config"),
+                || "auto".into(),
             )
             .unwrap();
         assert_eq!(selector, "auto");
@@ -958,6 +1021,14 @@ mod tests {
                 "typesafe/jev",
             ),
             (
+                "vercel",
+                JevProvider::Vercel,
+                "AI_GATEWAY_API_KEY",
+                "vercel-ai-gateway.env",
+                "https://ai-gateway.vercel.sh/v4/ai/evaluation-model",
+                "typesafe-ai/jev",
+            ),
+            (
                 "jcode",
                 JevProvider::Jcode,
                 "JCODE_API_KEY",
@@ -1006,6 +1077,7 @@ mod tests {
             "OPENROUTER_API_KEY",
             "TYPESAFE_API_KEY",
             "AIMLAPI_API_KEY",
+            "AI_GATEWAY_API_KEY",
             "JCODE_API_KEY",
         ] {
             let (provider, _) = resolve_with("auto", |env, _| {
@@ -1100,6 +1172,47 @@ mod tests {
             assert_eq!(body["questions"], Value::Object(questions()));
             assert!(body.get("messages").is_none());
         }
+        // Vercel: model travels in a header, noul is spelled boolean, state stays structured.
+        let body: Value = serde_json::from_slice(
+            &request_body(JevProvider::Vercel, json!({"memory": "example"}), &questions())
+                .unwrap(),
+        )
+        .unwrap();
+        assert!(body.get("model").is_none());
+        assert_eq!(body["state"], json!({"memory": "example"}));
+        assert_eq!(body["questions"]["m0"]["type"], "boolean");
+        assert_eq!(body["questions"]["m0"]["criteria"], questions()["m0"]["criteria"]);
+    }
+
+    #[tokio::test]
+    async fn vercel_gateway_wire_and_answers_map_to_decisions_shape() {
+        let gateway = json!({
+            "answers": {
+                "m0": {"type": "boolean", "probability": 0.93},
+                "pick": {"type": "choice", "choice": "a", "probabilities": {"a": 0.9, "b": 0.1}}
+            },
+            "providerMetadata": {"typesafe": {"confidence": {"pick": 0.8}}}
+        });
+        let (base, worker) = mock_server(vec![(200, gateway.to_string(), vec![])]);
+        let mut qs = questions();
+        qs.insert(
+            "pick".into(),
+            json!({"type": "choice", "instructions": "Pick", "criteria": {"a": "A", "b": "B"}}),
+        );
+        let client = mock_client(&base, JevProvider::Vercel);
+        let value = client.evaluate(json!("state"), qs).await.unwrap();
+        assert_eq!(value["answers"]["m0"], json!({"type": "noul", "noul": 0.93}));
+        assert_eq!(value["answers"]["pick"]["confidence"], json!(0.8));
+        let request = worker.join().unwrap().remove(0).to_ascii_lowercase();
+        for header in [
+            "ai-model-id: typesafe-ai/jev\r\n",
+            "ai-evaluation-model-specification-version: 4\r\n",
+            "ai-gateway-protocol-version: 0.0.1\r\n",
+            "authorization: bearer test-route-secret\r\n",
+        ] {
+            assert!(request.contains(header), "{header}");
+        }
+        assert!(request.contains("\"type\":\"boolean\""));
     }
 
     #[test]

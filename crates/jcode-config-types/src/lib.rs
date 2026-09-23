@@ -589,9 +589,13 @@ pub struct AgentsConfig {
     #[serde(default)]
     pub swarm_strip_layout: SwarmStripLayout,
     /// Jev Decisions provider for recall: auto, openrouter, typesafe, aimlapi,
-    /// or jcode. Auto uses a provider-specific BYOK credential before Jcode.
+    /// vercel, or jcode. Auto uses a provider-specific BYOK credential before Jcode.
     #[serde(default = "default_memory_jev_provider")]
     pub memory_jev_provider: String,
+    /// Jev provider for the browser handoff agent. Same values as memory.
+    /// `JCODE_BROWSER_JEV_PROVIDER` overrides it.
+    #[serde(default = "default_memory_jev_provider")]
+    pub browser_jev_provider: String,
     /// Minimum Jev relevance probability. Invalid values fail closed.
     #[serde(default = "default_memory_jev_threshold")]
     pub memory_jev_threshold: f32,
@@ -679,6 +683,7 @@ impl Default for AgentsConfig {
             swarm_gallery_max_pct: None,
             swarm_strip_layout: SwarmStripLayout::default(),
             memory_jev_provider: default_memory_jev_provider(),
+            browser_jev_provider: default_memory_jev_provider(),
             memory_jev_threshold: default_memory_jev_threshold(),
             memory_model: None,
             memory_sidecar_enabled: default_memory_sidecar_enabled(),

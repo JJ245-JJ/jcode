@@ -22,9 +22,9 @@ prefers the Jcode subscription credential, verifies the live `/v1/me`
 This requires the gateway browser rollout and its upstream service configuration.
 A saved login alone is not proof of entitlement or deployed support.
 
-`JCODE_BROWSER_JEV_PROVIDER` can explicitly select `jcode`, `openrouter`,
-`typesafe`, or `aimlapi`. Its default is `auto`: Jcode, then OpenRouter, TypeSafe,
-and AI/ML API, choosing the first configured credential. This setting is separate
+`browser_jev_provider` in `[agents]` (or `JCODE_BROWSER_JEV_PROVIDER`) can explicitly
+select `jcode`, `openrouter`, `typesafe`, `aimlapi`, or `vercel`. Its default is `auto`:
+Jcode, then OpenRouter, TypeSafe, AI/ML API, and Vercel, choosing the first configured credential. This setting is separate
 from memory's Jev provider. An entitlement, billing, or network error never
 silently switches to a personal paid key. Direct browser actions remain available.
 

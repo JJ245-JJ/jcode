@@ -147,6 +147,7 @@ async fn memory_cli_semantic_requires_jev_but_keyword_search_remains_local() {
         "OPENROUTER_API_KEY",
         "TYPESAFE_API_KEY",
         "AIMLAPI_API_KEY",
+        "AI_GATEWAY_API_KEY",
         "JCODE_MEMORY_JEV_PROVIDER",
     ];
     let _saved = SavedEnv::capture(&keys);
