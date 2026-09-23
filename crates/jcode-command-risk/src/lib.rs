@@ -47,10 +47,14 @@ pub use tokenize::{Token, tokenize};
 /// exists because issue #604 cost a user their home directory, and with this
 /// set nothing in jcode will stop the equivalent. Unset it to restore.
 pub fn gate_disabled() -> bool {
-    matches!(
-        std::env::var("JCODE_DISABLE_RISK_GATE").as_deref(),
-        Ok("1") | Ok("true") | Ok("yes")
-    )
+    // Unit tests assert the gate's real verdicts, so an operator who exports
+    // the override in their shell must not flip them. The integration test in
+    // tests/gate_disabled.rs is a separate crate build and still exercises it.
+    !cfg!(test)
+        && matches!(
+            std::env::var("JCODE_DISABLE_RISK_GATE").as_deref(),
+            Ok("1") | Ok("true") | Ok("yes")
+        )
 }
 
 /// How dangerous a command looks, and therefore how much scrutiny it earns.
