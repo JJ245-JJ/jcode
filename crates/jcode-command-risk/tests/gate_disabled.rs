@@ -14,6 +14,7 @@ fn disable_env_var_opens_both_seams_and_restores_when_unset() {
     let ctx = RiskContext {
         working_dir: Some(PathBuf::from("/home/u/proj")),
         home_dir: Some(PathBuf::from("/home/u")),
+        scratch_dir: None,
     };
     let no_justification = Justification::default();
 
