@@ -66,6 +66,9 @@ async fn persistent_terminal_public_case(
     let (ws_stream, _) = connect_async(format!("ws://{addr}/v1/responses"))
         .await
         .unwrap();
+    // A known catalog keeps a background GET /v1/models off the loopback
+    // listener, where it would take the accept meant for the fresh websocket.
+    jcode_base::provider::populate_account_models(vec!["gpt-5.6-sol".to_string()]);
     let provider = OpenAIProvider::new(prewarm_test_credentials());
     *provider.credentials.write().await = prewarm_test_credentials();
     provider.set_model("gpt-5.6-sol").unwrap();
