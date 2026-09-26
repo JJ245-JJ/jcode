@@ -771,6 +771,7 @@ fn cursor_status_is_available_for_authenticated_cli_session() {
     let _lock = crate::storage::lock_test_env();
     let prev_api_key = std::env::var_os("CURSOR_API_KEY");
     let prev_cli_path = std::env::var_os("JCODE_CURSOR_CLI_PATH");
+    let prev_home = std::env::var_os("JCODE_HOME");
     let temp = tempfile::TempDir::new().expect("create temp dir");
     let mock_cli = write_mock_cursor_agent(
         temp.path(),
@@ -779,6 +780,8 @@ fn cursor_status_is_available_for_authenticated_cli_session() {
 
     crate::env::remove_var("CURSOR_API_KEY");
     crate::env::set_var("JCODE_CURSOR_CLI_PATH", &mock_cli);
+    // Isolate from a real Cursor login (state.vscdb / auth.json) on the host.
+    crate::env::set_var("JCODE_HOME", temp.path().join("jcode-home"));
     AuthStatus::invalidate_cache();
 
     // Since 203c5cc95 jcode uses native Cursor auth only; a cursor-agent CLI
@@ -788,6 +791,7 @@ fn cursor_status_is_available_for_authenticated_cli_session() {
 
     restore_env_var("CURSOR_API_KEY", prev_api_key);
     restore_env_var("JCODE_CURSOR_CLI_PATH", prev_cli_path);
+    restore_env_var("JCODE_HOME", prev_home);
     AuthStatus::invalidate_cache();
 }
 
