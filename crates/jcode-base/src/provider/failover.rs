@@ -6,18 +6,6 @@ impl MultiProvider {
         self.reconcile_auth_if_provider_missing(provider)
     }
 
-    pub(super) fn provider_precheck_unavailable_reason(
-        &self,
-        provider: ActiveProvider,
-    ) -> Option<String> {
-        match provider {
-            ActiveProvider::Claude if self.is_claude_usage_exhausted() => Some(
-                crate::provider::account_failover::usage_exhausted_reason(provider),
-            ),
-            _ => None,
-        }
-    }
-
     pub(super) fn build_failover_prompt(
         &self,
         from: ActiveProvider,

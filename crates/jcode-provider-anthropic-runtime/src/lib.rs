@@ -484,11 +484,6 @@ pub struct AnthropicProvider {
 }
 
 impl AnthropicProvider {
-    fn is_usage_exhausted() -> bool {
-        let usage = jcode_base::usage::get_sync();
-        usage.five_hour >= 0.99 && usage.seven_day >= 0.99
-    }
-
     fn best_available_opus_model(exclude: &str) -> Option<String> {
         let mut models = jcode_base::provider::cached_anthropic_model_ids()
             .unwrap_or_else(jcode_base::provider::known_anthropic_model_ids);
@@ -624,13 +619,8 @@ impl AnthropicProvider {
     }
 
     pub fn new() -> Self {
-        let model = std::env::var("JCODE_ANTHROPIC_MODEL").unwrap_or_else(|_| {
-            if Self::is_usage_exhausted() {
-                "claude-sonnet-4-6".to_string()
-            } else {
-                DEFAULT_MODEL.to_string()
-            }
-        });
+        let model =
+            std::env::var("JCODE_ANTHROPIC_MODEL").unwrap_or_else(|_| DEFAULT_MODEL.to_string());
 
         // Trigger background usage fetch so extra_usage is known before first API call
         let _ = tokio::runtime::Handle::try_current().map(|_| {

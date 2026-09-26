@@ -693,22 +693,6 @@ impl MultiProvider {
                 continue;
             }
 
-            if let Some(reason) = self.provider_precheck_unavailable_reason(candidate) {
-                let note = format!("{}: {}", label, reason);
-                if candidate == active {
-                    crate::logging::warn(&format!(
-                        "Failover{}: skipping active provider {} - {}",
-                        mode.log_suffix(),
-                        label,
-                        reason
-                    ));
-                    failover_reason = Some(reason.clone());
-                }
-                notes.push(note);
-                record_provider_unavailable_for_account(key, &reason);
-                continue;
-            }
-
             let attempt = match mode {
                 CompletionMode::Unified { system } => {
                     self.complete_on_provider(candidate, messages, tools, system, resume_session_id)
