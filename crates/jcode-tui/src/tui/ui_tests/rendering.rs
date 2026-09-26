@@ -635,6 +635,8 @@ fn test_light_theme_adapted_frame_has_readable_contrast() {
 /// guards the hook's presence and its ordering relative to the light/dark pass.
 #[test]
 fn test_configured_palette_recolors_a_real_rendered_frame() {
+    // Distinct truecolor values collapse to one xterm index on 256-color hosts.
+    jcode_tui_style::color::pin_truecolor_for_tests();
     fn render() -> ratatui::buffer::Buffer {
         let messages = vec![
             DisplayMessage {

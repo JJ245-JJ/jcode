@@ -556,6 +556,8 @@ fn test_subagent_model_large_catalog_uses_cached_searchable_picker() {
 
 #[test]
 fn test_model_picker_reuses_cached_entries_until_invalidated() {
+    // Model catalogs and routes are process-global; serialize with env-mutating tests.
+    let _env_lock = crate::storage::lock_test_env();
     ensure_test_jcode_home_if_unset();
     clear_persisted_test_ui_state();
     crate::tui::ui::clear_test_render_state_for_tests();
@@ -841,6 +843,8 @@ fn test_tui_cerebras_paste_key_lifecycle_has_no_degraded_success_messages() {
     rt.block_on(async {
         while !(saw_saved && saw_catalog_started && saw_activation && saw_catalog_ready) {
             match tokio::time::timeout(Duration::from_secs(2), bus_rx.recv()).await {
+                // Parallel tests publish other providers' logins on the global bus.
+                Ok(Ok(crate::bus::BusEvent::LoginCompleted(login))) if login.provider != "Cerebras" => {}
                 Ok(Ok(crate::bus::BusEvent::LoginCompleted(login))) => {
                     if login.success {
                         login_success_events += 1;
@@ -887,6 +891,10 @@ fn test_tui_cerebras_paste_key_lifecycle_has_no_degraded_success_messages() {
                         Ok(crate::bus::BusEvent::UiActivity(activity)),
                     );
                 }
+                // The bus is process-global: skip activations published by
+                // parallel tests for other providers.
+                Ok(Ok(crate::bus::BusEvent::ProviderModelActivated { provider_key, .. }))
+                    if provider_key.as_deref() != Some("cerebras") => {}
                 Ok(Ok(event @ crate::bus::BusEvent::ProviderModelActivated { .. })) => {
                     activation_events += 1;
                     if let crate::bus::BusEvent::ProviderModelActivated {
@@ -916,6 +924,7 @@ fn test_tui_cerebras_paste_key_lifecycle_has_no_degraded_success_messages() {
 
     while let Ok(event) = bus_rx.try_recv() {
         match event {
+            crate::bus::BusEvent::LoginCompleted(login) if login.provider != "Cerebras" => {}
             crate::bus::BusEvent::LoginCompleted(login) => {
                 if login.success {
                     login_success_events += 1;
@@ -941,7 +950,7 @@ fn test_tui_cerebras_paste_key_lifecycle_has_no_degraded_success_messages() {
                 provider_key,
                 message,
                 ..
-            } => {
+            } if provider_key.as_deref() == Some("cerebras") => {
                 activation_events += 1;
                 assert_eq!(model, "qwen-3-235b-a22b-instruct-2507");
                 assert_eq!(provider_key.as_deref(), Some("cerebras"));
@@ -1222,6 +1231,8 @@ fn test_tui_openai_compatible_local_refresh_failure_is_pending_not_final_failure
 
 #[test]
 fn test_model_picker_opens_simplified_state_before_async_routes_complete() {
+    // Model catalogs and routes are process-global; serialize with env-mutating tests.
+    let _env_lock = crate::storage::lock_test_env();
     ensure_test_jcode_home_if_unset();
     clear_persisted_test_ui_state();
     crate::tui::ui::clear_test_render_state_for_tests();
@@ -1264,6 +1275,8 @@ fn test_model_picker_opens_simplified_state_before_async_routes_complete() {
 
 #[test]
 fn test_model_picker_state_space_preserves_provider_labels_after_route_hydration() {
+    // Model catalogs and routes are process-global; serialize with env-mutating tests.
+    let _env_lock = crate::storage::lock_test_env();
     ensure_test_jcode_home_if_unset();
     clear_persisted_test_ui_state();
     crate::tui::ui::clear_test_render_state_for_tests();
@@ -1741,6 +1754,8 @@ fn test_azure_login_completion_switches_local_model_without_completion() {
 
 #[test]
 fn test_local_model_picker_surfaces_antigravity_models_from_multiprovider() {
+    // Model catalogs and routes are process-global; serialize with env-mutating tests.
+    let _env_lock = crate::storage::lock_test_env();
     let mut app = create_antigravity_picker_test_app();
     app.open_model_picker();
     wait_for_model_picker_load(&mut app);
@@ -1859,6 +1874,8 @@ fn test_agent_model_picker_openrouter_bare_openai_route_saves_openai_catalog_pre
 
 #[test]
 fn test_local_model_picker_render_shows_antigravity_models_exactly_as_user_sees_them() {
+    // Model catalogs and routes are process-global; serialize with env-mutating tests.
+    let _env_lock = crate::storage::lock_test_env();
     let mut app = create_antigravity_picker_test_app();
     app.display_messages = vec![DisplayMessage::system("seed render state")];
     app.bump_display_messages_version();
