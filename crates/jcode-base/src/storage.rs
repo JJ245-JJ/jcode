@@ -38,9 +38,14 @@ pub fn test_env_lock() -> &'static Mutex<()> {
             "JCODE_ACTIVE_PROVIDER",
             "JCODE_RUNTIME_PROVIDER",
             "ANTHROPIC_AUTH_TOKEN",
+            "JCODE_PROVIDER_FCC_API_KEY",
         ] {
             crate::env::remove_var(key);
         }
+        // An operator's `[agents] swarm_model` pin (e.g. a proxy route) would
+        // make every spawn test resolve a provider the mock cannot switch to.
+        // Empty clears the pin; tests that need one set it themselves.
+        crate::env::set_var("JCODE_SWARM_MODEL", "");
         Mutex::new(())
     })
 }
