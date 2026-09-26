@@ -793,6 +793,10 @@ mod tests {
     #[tokio::test]
     async fn debug_tool_selfdev_reload_returns_promptly_for_direct_execution() {
         let _env_lock = lock_env();
+        // The reload path writes the build manifest, reload traces and pid
+        // markers under jcode_dir(); keep them out of the real ~/.jcode.
+        let home = tempfile::TempDir::new().unwrap();
+        let _home = EnvGuard::set("JCODE_HOME", home.path().to_str().unwrap());
         let _test_session = EnvGuard::set("JCODE_TEST_SESSION", "1");
         let _debug_control = EnvGuard::set("JCODE_DEBUG_CONTROL", "1");
 
