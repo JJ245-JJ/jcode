@@ -23,6 +23,17 @@ fn test_writer() -> Result<(Arc<Mutex<WriteHalf>>, crate::transport::Stream)> {
     Ok((Arc::new(Mutex::new(writer_half)), stream_b))
 }
 
+/// Writer whose peer is drained in the background. Use when a test never reads
+/// the peer: a history payload larger than the socketpair buffer otherwise
+/// blocks `write_all` forever while the test holds the global env lock.
+fn drained_test_writer() -> Result<Arc<Mutex<WriteHalf>>> {
+    let (writer, peer) = test_writer()?;
+    tokio::spawn(async move {
+        let _ = tokio::io::copy(&mut { peer }, &mut tokio::io::sink()).await;
+    });
+    Ok(writer)
+}
+
 include!("resume/multiple_live_attach.rs");
 include!("resume/busy_existing_attach.rs");
 include!("resume/reconnect_takeover_with_history.rs");

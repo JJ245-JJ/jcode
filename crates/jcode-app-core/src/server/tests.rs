@@ -327,6 +327,9 @@ fn persisted_headless_member(
 
 #[tokio::test]
 async fn background_task_wake_runs_live_session_immediately_when_idle() {
+    // Reads wake_mode from config; the external-wake test sets JCODE_WAKE_MODE
+    // under this lock, so racing it here routes the wake externally.
+    let _env_lock = crate::storage::lock_test_env();
     let provider = Arc::new(StreamingMockProvider::default());
     provider.queue_response(vec![
         StreamEvent::TextDelta("Build result processed.".to_string()),
