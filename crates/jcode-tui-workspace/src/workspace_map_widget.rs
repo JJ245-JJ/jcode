@@ -273,8 +273,19 @@ mod tests {
         let mut buf = Buffer::empty(Rect::new(0, 0, 20, 6));
         render_workspace_map(&mut buf, Rect::new(0, 0, 20, 6), &rows, 0);
 
+        // 256-color terminals (Apple Terminal, most CI) quantize to an index;
+        // map it back through the xterm cube before judging the hue.
+        let rgb_of = |color| match color {
+            Some(ratatui::style::Color::Rgb(r, g, b)) => Some((r, g, b)),
+            Some(ratatui::style::Color::Indexed(i)) if (16..232).contains(&i) => {
+                let level = |v: u8| if v == 0 { 0 } else { 55 + v * 40 };
+                let i = i - 16;
+                Some((level(i / 36), level((i / 6) % 6), level(i % 6)))
+            }
+            _ => None,
+        };
         let has_greenish_fg = buf.content().iter().any(|cell| {
-            matches!(cell.style().fg, Some(ratatui::style::Color::Rgb(r, g, b)) if g > r && g > b)
+            matches!(rgb_of(cell.style().fg), Some((r, g, b)) if g > r && g > b)
         });
         assert!(has_greenish_fg);
     }

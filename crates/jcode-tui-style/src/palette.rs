@@ -569,6 +569,8 @@ mod buffer_tests {
 
     #[test]
     fn configured_role_recolors_role_cells_and_named_colors_only() {
+        // Asserts exact RGB; do not let a 256-color host quantize it.
+        crate::color::pin_truecolor_for_tests();
         let mut palette = Palette::default();
         palette.set(Role::Error, (10, 80, 240));
         with_palette(palette, || {
@@ -630,6 +632,8 @@ mod light_theme_interaction {
     /// behavior.
     #[test]
     fn configured_colors_survive_the_light_theme_pass() {
+        // Asserts exact RGB; do not let a 256-color host quantize it.
+        crate::color::pin_truecolor_for_tests();
         let _lock = crate::STYLE_TEST_LOCK
             .lock()
             .unwrap_or_else(|e| e.into_inner());
