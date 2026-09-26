@@ -3391,6 +3391,11 @@ fn named_profile_supports_reasoning_effort_config_override() {
 fn named_profile_construction_reads_openai_reasoning_effort_config() {
     let _lock = ENV_LOCK.lock();
     let _namespace = EnvVarGuard::remove("JCODE_OPENROUTER_CACHE_NAMESPACE");
+    // Keep the host's config.toml (context overrides, reasoning effort) out.
+    let _home_dir = tempfile::tempdir().expect("temp home");
+    let _home = EnvVarGuard::set("JCODE_HOME", _home_dir.path().to_str().expect("utf8"));
+    // Downstream crates keep jcode-base's 500 ms config throttle; reload now.
+    jcode_base::config::invalidate_config_cache();
 
     let config = jcode_base::config::NamedProviderConfig {
         base_url: "https://compat.example.test/v1".to_string(),

@@ -71,6 +71,11 @@ fn explicit_context_window_still_wins_over_the_ollama_clamp() {
 fn ollama_cloud_model_is_not_clamped_to_the_local_runner_default() {
     let _lock = ENV_LOCK.lock();
     let _namespace = EnvVarGuard::remove("JCODE_OPENROUTER_CACHE_NAMESPACE");
+    // Keep the host's config.toml (context overrides, reasoning effort) out.
+    let _home_dir = tempfile::tempdir().expect("temp home");
+    let _home = EnvVarGuard::set("JCODE_HOME", _home_dir.path().to_str().expect("utf8"));
+    // Downstream crates keep jcode-base's 500 ms config throttle; reload now.
+    jcode_base::config::invalidate_config_cache();
     let mut config = jcode_base::config::NamedProviderConfig {
         base_url: "http://localhost:11434/v1".to_string(),
         auth: jcode_base::config::NamedProviderAuth::None,
