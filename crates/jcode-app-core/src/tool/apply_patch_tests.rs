@@ -252,6 +252,9 @@ fn test_parse_update_without_explicit_at() {
 
 #[tokio::test]
 async fn apply_patch_refuses_to_delete_a_protected_path() {
+    // The gate's real verdicts are under test: clear an operator-exported
+    // JCODE_DISABLE_RISK_GATE for the duration.
+    let _risk_gate_on = crate::tool::test_risk_gate_on();
     let temp = tempfile::tempdir().expect("temp home");
     let home = temp.path().to_path_buf();
     let previous = std::env::var("HOME").ok();

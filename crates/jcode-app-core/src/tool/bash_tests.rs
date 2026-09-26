@@ -978,9 +978,13 @@ fn gate_ctx(working_dir: &str) -> ToolContext {
 
 #[tokio::test]
 async fn bash_refuses_to_delete_the_home_directory() {
+    // The gate's real verdicts are under test: clear an operator-exported
+    // JCODE_DISABLE_RISK_GATE for the duration.
+    let _risk_gate_on = crate::tool::test_risk_gate_on();
     // The #604 incident, at the real tool boundary.
     let temp = tempfile::tempdir().expect("temp home");
     let home = temp.path().to_string_lossy().to_string();
+    // HOME is process-global; the risk-gate guard above holds the env lock.
     let previous = std::env::var("HOME").ok();
     // SAFETY: single-threaded test setup; restored below.
     unsafe { std::env::set_var("HOME", &home) };
@@ -1013,6 +1017,9 @@ async fn bash_refuses_to_delete_the_home_directory() {
 
 #[tokio::test]
 async fn bash_holds_a_risky_delete_until_justified_then_runs_it() {
+    // The gate's real verdicts are under test: clear an operator-exported
+    // JCODE_DISABLE_RISK_GATE for the duration.
+    let _risk_gate_on = crate::tool::test_risk_gate_on();
     let temp = tempfile::tempdir().expect("temp dir");
     let workdir = temp.path().join("work");
     let target = temp.path().join("outside");
@@ -1084,12 +1091,16 @@ async fn bash_does_not_interfere_with_ordinary_commands() {
 
 #[tokio::test]
 async fn indirect_dispatch_paths_cannot_bypass_the_gate() {
+    // The gate's real verdicts are under test: clear an operator-exported
+    // JCODE_DISABLE_RISK_GATE for the duration.
+    let _risk_gate_on = crate::tool::test_risk_gate_on();
     // batch, and every other caller, dispatch through Tool::execute rather than
     // reimplementing it, so the gate lives at the only chokepoint. Assert that
     // directly: calling execute for a background job (the one path that returns
     // early) is still gated.
     let temp = tempfile::tempdir().expect("temp home");
     let home = temp.path().to_string_lossy().to_string();
+    // HOME is process-global; the risk-gate guard above holds the env lock.
     let previous = std::env::var("HOME").ok();
     // SAFETY: single-threaded test setup; restored below.
     unsafe { std::env::set_var("HOME", &home) };

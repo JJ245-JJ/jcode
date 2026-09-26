@@ -116,6 +116,9 @@ mod tests {
 
     #[test]
     fn protected_writes_and_unknown_variables_remain_blocked() {
+        // The gate's real verdicts are under test: clear an operator-exported
+        // JCODE_DISABLE_RISK_GATE for the duration.
+        let _risk_gate_on = crate::tool::test_risk_gate_on();
         for command in [
             "rm -rf /etc",
             "echo bad > /etc/passwd",

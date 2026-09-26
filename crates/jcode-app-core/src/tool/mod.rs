@@ -1709,3 +1709,22 @@ mod mcp_allow_list_tests {
 
 #[cfg(test)]
 mod tests;
+
+/// Test guard: hold the env lock and clear `JCODE_DISABLE_RISK_GATE`, restoring
+/// it on drop, so gate tests assert real verdicts even when the operator has
+/// exported the override in the shell running `cargo test`.
+#[cfg(test)]
+pub(crate) fn test_risk_gate_on() -> impl Drop {
+    struct Guard(Option<std::ffi::OsString>, std::sync::MutexGuard<'static, ()>);
+    impl Drop for Guard {
+        fn drop(&mut self) {
+            if let Some(value) = self.0.take() {
+                crate::env::set_var("JCODE_DISABLE_RISK_GATE", value);
+            }
+        }
+    }
+    let lock = crate::storage::lock_test_env();
+    let previous = std::env::var_os("JCODE_DISABLE_RISK_GATE");
+    crate::env::remove_var("JCODE_DISABLE_RISK_GATE");
+    Guard(previous, lock)
+}
