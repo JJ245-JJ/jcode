@@ -41,8 +41,14 @@ async fn restore_for_concurrency_test(
 ) -> Result<Arc<Mutex<Agent>>> {
     let mut client_selfdev = false;
     let mut client_session_id = source.lock().await.session_id().to_owned();
-    let (stream, _peer) = crate::transport::stream_pair()?;
+    let (stream, peer) = crate::transport::stream_pair()?;
     let (_, writer) = stream.into_split();
+    // Drain the peer: a full history payload can exceed the socketpair buffer,
+    // and an unread peer then blocks `write_all` forever while this test holds
+    // the global test env lock, hanging every later env-locked test.
+    tokio::spawn(async move {
+        let _ = tokio::io::copy(&mut { peer }, &mut tokio::io::sink()).await;
+    });
     let writer = Arc::new(Mutex::new(writer));
     let (client_event_tx, _client_event_rx) = mpsc::unbounded_channel();
     let (swarm_event_tx, _swarm_event_rx) = broadcast::channel(8);
