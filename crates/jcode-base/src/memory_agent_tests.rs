@@ -91,6 +91,9 @@ async fn automatic_recall_uses_jev_http_without_embeddings_or_sidecar() {
                 }
                 Err(error) => panic!("{error}"),
             };
+            // Accepted sockets inherit O_NONBLOCK on BSD/macOS; restore
+            // blocking so the read timeout applies.
+            stream.set_nonblocking(false).unwrap();
             stream
                 .set_read_timeout(Some(Duration::from_secs(3)))
                 .unwrap();

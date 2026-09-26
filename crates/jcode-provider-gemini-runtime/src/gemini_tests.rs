@@ -1082,6 +1082,9 @@ fn post_json_retries_transient_http_responses_against_local_server() {
                     Err(err) => panic!("accept: {err}"),
                 }
             };
+            // Accepted sockets inherit O_NONBLOCK on BSD/macOS; restore
+            // blocking so the read timeout applies.
+            stream.set_nonblocking(false).unwrap();
             stream
                 .set_read_timeout(Some(Duration::from_secs(2)))
                 .unwrap();

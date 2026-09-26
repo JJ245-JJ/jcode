@@ -116,6 +116,10 @@ impl UnixHarness {
             while !server_stop.load(Ordering::Acquire) {
                 match listener.accept() {
                     Ok((socket, _)) => {
+                        // BSD/macOS accepted sockets inherit the listener's
+                        // O_NONBLOCK; blocking reads then fail with WouldBlock
+                        // and the mock drops the connection mid-handshake.
+                        socket.set_nonblocking(false).expect("blocking socket");
                         server_clients.fetch_add(1, Ordering::AcqRel);
                         let sessions = Arc::clone(&server_sessions);
                         let clients = Arc::clone(&server_clients);
