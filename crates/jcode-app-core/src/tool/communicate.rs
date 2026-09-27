@@ -2050,7 +2050,7 @@ impl Tool for CommunicateTool {
                 },
                 "to_swarm": {
                     "type": "string",
-                    "description": "Cross-swarm DM: target swarm label or id (see list_swarms). With to_session, DMs that agent in that swarm; without, DMs its coordinator."
+                    "description": "Cross-swarm DM target (swarm label or id). With to_session, DMs that agent; else its coordinator."
                 },
                 "channel": {
                     "type": "string",
@@ -2069,7 +2069,7 @@ impl Tool for CommunicateTool {
                 "label": {
                     "type": "string",
                     "minLength": 1,
-                    "description": "Required for spawn. Short label shown on the agent's chip (e.g. 'api reviewer'). For set_swarm_label, your swarm's new unique label."
+                    "description": "Required for spawn: short chip label, e.g. 'api reviewer'. set_swarm_label: new unique swarm label."
                 },
                 "working_dir": {
                     "type": "string",
