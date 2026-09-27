@@ -908,7 +908,13 @@ impl Tool for BashTool {
                 && std::env::var("BROWSER_SESSION").is_err()
                 && let Some(session_name) = crate::browser::ensure_browser_session(&ctx.session_id)
             {
-                params.command = format!("BROWSER_SESSION={} {}", session_name, params.command);
+                params.command = format!(
+                    "BROWSER_SESSION={} {}='{}' {}",
+                    session_name,
+                    crate::browser::BRIDGE_RUNTIME_ENV,
+                    crate::browser::bridge_runtime_dir().display(),
+                    params.command
+                );
             }
         }
 

@@ -1011,6 +1011,10 @@ async fn firefox_run_bridge_command(
     let params_json = serde_json::to_string(&params)?;
     let mut command = tokio::process::Command::new(&bin);
     command.arg(action).arg(&params_json);
+    command.env(
+        crate::browser::BRIDGE_RUNTIME_ENV,
+        crate::browser::bridge_runtime_dir(),
+    );
     command.kill_on_drop(true);
     command.stdin(std::process::Stdio::null());
     command.stdout(std::process::Stdio::piped());

@@ -174,6 +174,15 @@ fn runtime_dir() -> PathBuf {
     storage::runtime_dir()
 }
 
+/// The bridge CLI only honours `XDG_RUNTIME_DIR` (else `/tmp`), while jcode uses
+/// `$TMPDIR` on macOS. Every bridge spawn sets this so both agree on where session
+/// sockets live; otherwise each session start looked dead and cost 10-20s.
+pub const BRIDGE_RUNTIME_ENV: &str = "XDG_RUNTIME_DIR";
+
+pub fn bridge_runtime_dir() -> PathBuf {
+    runtime_dir()
+}
+
 fn session_socket_path(name: &str) -> PathBuf {
     runtime_dir().join(format!("browser-session-{}.sock", name))
 }
@@ -240,6 +249,7 @@ fn spawn_browser_session(
     }
     let result = std::process::Command::new(bin)
         .args(&args)
+        .env(BRIDGE_RUNTIME_ENV, runtime_dir())
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::null())
@@ -1073,7 +1083,9 @@ async fn run_browser_cli_capped(
     timeout: std::time::Duration,
 ) -> Result<Option<std::process::Output>> {
     let mut cmd = tokio::process::Command::new(bin);
-    cmd.args(args).kill_on_drop(true);
+    cmd.args(args)
+        .env(BRIDGE_RUNTIME_ENV, runtime_dir())
+        .kill_on_drop(true);
 
     match tokio::time::timeout(timeout, cmd.output()).await {
         Ok(output) => Ok(Some(output?)),

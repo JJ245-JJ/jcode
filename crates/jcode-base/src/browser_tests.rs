@@ -232,6 +232,58 @@ fn ensure_browser_session_fails_fast_when_session_process_exits_immediately() {
     }
 }
 
+/// The real bridge CLI writes session files under `${XDG_RUNTIME_DIR:-/tmp}`.
+/// jcode must pass its own runtime dir, or on macOS ($TMPDIR) the session never
+/// looks alive and every browser action waits out the 10s startup deadline.
+#[cfg(unix)]
+#[test]
+fn ensure_browser_session_finds_session_bridge_writes_under_xdg_runtime_dir() {
+    use std::os::unix::fs::PermissionsExt;
+    use std::time::{Duration, Instant};
+
+    let _guard = crate::storage::lock_test_env();
+    let prev: Vec<_> = ["JCODE_HOME", "JCODE_RUNTIME_DIR", "XDG_RUNTIME_DIR"]
+        .into_iter()
+        .map(|key| (key, std::env::var_os(key)))
+        .collect();
+    let temp = tempfile::TempDir::new().expect("create temp dir");
+    let runtime = temp.path().join("rt");
+    std::fs::create_dir_all(&runtime).expect("create runtime dir");
+    crate::env::set_var("JCODE_HOME", temp.path());
+    crate::env::set_var("JCODE_RUNTIME_DIR", &runtime);
+    crate::env::remove_var("XDG_RUNTIME_DIR");
+
+    let browser_dir = temp.path().join("browser");
+    std::fs::create_dir_all(&browser_dir).expect("create browser dir");
+    let bin = browser_dir.join("browser");
+    std::fs::write(
+        &bin,
+        "#!/bin/sh\n[ \"$3\" = --help ] && exit 0\nd=\"${XDG_RUNTIME_DIR:-/tmp}\"\n\
+         echo $$ > \"$d/browser-session-$3.pid\"\ntouch \"$d/browser-session-$3.sock\"\nexec sleep 30\n",
+    )
+    .expect("write fake browser binary");
+    std::fs::set_permissions(&bin, std::fs::Permissions::from_mode(0o755))
+        .expect("chmod fake browser binary");
+
+    let start = Instant::now();
+    let session = ensure_browser_session("xdg-runtime-session");
+    let elapsed = start.elapsed();
+    if let Ok(pid) = std::fs::read_to_string(runtime.join("browser-session-xdg-runtime-session.pid")) {
+        let _ = std::process::Command::new("kill").arg(pid.trim()).status();
+    }
+    let _ = std::fs::remove_file("/tmp/browser-session-xdg-runtime-session.pid");
+    let _ = std::fs::remove_file("/tmp/browser-session-xdg-runtime-session.sock");
+    for (key, value) in prev {
+        match value {
+            Some(value) => crate::env::set_var(key, value),
+            None => crate::env::remove_var(key),
+        }
+    }
+
+    assert_eq!(session.as_deref(), Some("xdg-runtime-session"));
+    assert!(elapsed < Duration::from_secs(3), "session start took {elapsed:?}");
+}
+
 #[cfg(unix)]
 #[test]
 fn ensure_browser_session_does_not_pass_unsupported_bind_window_flag() {
