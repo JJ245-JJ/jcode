@@ -291,6 +291,17 @@ pub fn derive_session_provider_key(provider_name: &str) -> Option<String> {
         return Some("jcode".to_string());
     }
 
+    // An Anthropic-compatible profile (e.g. `fcc`) runs under the Claude runtime
+    // with JCODE_RUNTIME_PROVIDER=anthropic-api. Persisting that restores onto the
+    // official API-key route, which fails without a key. The profile name restores
+    // as `<profile>:<model>`. Switching to official Claude clears this env.
+    if matches!(normalized_name.as_str(), "anthropic" | "claude")
+        && let Ok(profile) = std::env::var("JCODE_NAMED_PROVIDER_PROFILE")
+        && !profile.trim().is_empty()
+    {
+        return Some(profile.trim().to_string());
+    }
+
     if let Ok(runtime_provider) = std::env::var("JCODE_RUNTIME_PROVIDER") {
         let runtime_provider = runtime_provider.trim().to_ascii_lowercase();
         if !runtime_provider.is_empty() && runtime_provider != "openai-compatible" {

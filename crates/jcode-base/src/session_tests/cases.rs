@@ -56,6 +56,21 @@ fn derive_session_provider_key_falls_back_to_openrouter_namespace() {
 }
 
 #[test]
+fn derive_session_provider_key_uses_anthropic_compatible_profile_name() {
+    let _lock = lock_env();
+    let _runtime = EnvVarGuard::set("JCODE_RUNTIME_PROVIDER", "anthropic-api");
+    let _profile = EnvVarGuard::set("JCODE_NAMED_PROVIDER_PROFILE", "fcc");
+
+    assert_eq!(derive_session_provider_key("Claude").as_deref(), Some("fcc"));
+
+    let _profile = EnvVarGuard::remove("JCODE_NAMED_PROVIDER_PROFILE");
+    assert_eq!(
+        derive_session_provider_key("Claude").as_deref(),
+        Some("anthropic-api")
+    );
+}
+
+#[test]
 fn derive_session_provider_key_keeps_openai_compatible_profile_namespace() {
     let _lock = lock_env();
     let _runtime = EnvVarGuard::set("JCODE_RUNTIME_PROVIDER", "openai-compatible");
