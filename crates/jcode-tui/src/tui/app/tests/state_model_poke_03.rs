@@ -1407,6 +1407,8 @@ fn test_local_model_picker_selection_failure_keeps_picker_open_and_shows_next_st
 
 #[test]
 fn test_login_completed_spawns_auth_refresh_when_runtime_is_available() {
+    // Login activation writes provider env; hold the env lock and restore it.
+    let _sandbox = crate::auth::test_sandbox::AuthTestSandbox::new().unwrap();
     ensure_test_jcode_home_if_unset();
     clear_persisted_test_ui_state();
     crate::tui::ui::clear_test_render_state_for_tests();
@@ -1451,6 +1453,7 @@ fn test_login_completed_spawns_auth_refresh_when_runtime_is_available() {
 
 #[test]
 fn test_model_picker_waits_for_async_post_login_catalog_activation() {
+    let _sandbox = crate::auth::test_sandbox::AuthTestSandbox::new().unwrap();
     ensure_test_jcode_home_if_unset();
     clear_persisted_test_ui_state();
     crate::tui::ui::clear_test_render_state_for_tests();
@@ -1536,6 +1539,7 @@ fn test_model_picker_waits_for_async_post_login_catalog_activation() {
 
 #[test]
 fn test_login_completed_surfaces_new_provider_models_in_local_model_picker() {
+    let _sandbox = crate::auth::test_sandbox::AuthTestSandbox::new().unwrap();
     let mut app = create_auth_refresh_test_app();
 
     app.handle_login_completed(crate::bus::LoginCompleted {
