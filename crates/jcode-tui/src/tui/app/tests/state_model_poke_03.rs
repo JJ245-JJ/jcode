@@ -1104,6 +1104,9 @@ fn test_tui_cerebras_paste_key_lifecycle_has_no_degraded_success_messages() {
 
 #[test]
 fn test_tui_openai_compatible_empty_catalog_does_not_switch_to_profile_default() {
+    // Listens on the global bus; serialize with login tests that publish
+    // ProviderModelActivated from their detached activation tasks.
+    let _env_lock = crate::storage::lock_test_env();
     ensure_test_jcode_home_if_unset();
     clear_persisted_test_ui_state();
     crate::tui::ui::clear_test_render_state_for_tests();
@@ -1943,6 +1946,9 @@ GPT:
 
 #[test]
 fn test_login_smoke_model_picker_renders_unstacked_provider_rows() {
+    // The async route load is discarded if the config-derived picker signature
+    // changes mid-load, so keep JCODE_HOME (and thus config) stable.
+    let _env_lock = crate::storage::lock_test_env();
     let mut app = create_login_smoke_model_app();
     app.display_messages = vec![DisplayMessage::system("seed render state")];
     app.bump_display_messages_version();
