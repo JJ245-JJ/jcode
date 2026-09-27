@@ -44,9 +44,10 @@ fn set_socket_test_env(socket_path: &Path, runtime_dir: &Path) -> EnvVarGuard {
 }
 
 struct TestEnvGuard {
-    _lock: std::sync::MutexGuard<'static, ()>,
     _env: EnvVarGuard,
     _temp_home: tempfile::TempDir,
+    // Last: fields drop in order, so env is restored before the lock is released.
+    _lock: std::sync::MutexGuard<'static, ()>,
 }
 
 impl TestEnvGuard {

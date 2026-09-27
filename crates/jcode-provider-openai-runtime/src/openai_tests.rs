@@ -152,10 +152,11 @@ async fn test_persistent_ws_state_with_ping_notify() -> (
 }
 
 struct LiveOpenAITestEnv {
-    _lock: MutexGuard<'static, ()>,
     _jcode_home: EnvVarGuard,
     _transport: EnvVarGuard,
     _temp: tempfile::TempDir,
+    // Last: fields drop in order, so env is restored before the lock is released.
+    _lock: MutexGuard<'static, ()>,
 }
 
 impl LiveOpenAITestEnv {
