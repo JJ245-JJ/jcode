@@ -2030,7 +2030,7 @@ impl Tool for CommunicateTool {
                 },
                 "tldr": {
                     "type": "string",
-                    "description": "Optional one-line summary under ~120 chars. Recommended for message/report bodies longer than 240 chars. When omitted, a compact preview is derived automatically without blocking delivery."
+                    "description": "One-line summary under ~120 chars for bodies over 240 chars. Auto-derived if omitted."
                 },
                 "status": {
                     "type": "string",
