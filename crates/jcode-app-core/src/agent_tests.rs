@@ -2070,7 +2070,7 @@ fn fable_guardrail_reconsideration_is_narrow_and_bounded() {
         0,
         1,
     ));
-    assert!(!Agent::should_reconsider_fable_guardrail(
+    assert!(Agent::should_reconsider_fable_guardrail(
         "claude-opus-5",
         Some("refusal"),
         0,

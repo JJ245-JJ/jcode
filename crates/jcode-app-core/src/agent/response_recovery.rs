@@ -175,14 +175,17 @@ impl Agent {
     }
 
     pub(crate) fn should_reconsider_fable_guardrail(
-        model: &str,
+        _model: &str,
         stop_reason: Option<&str>,
         attempts: u32,
         max_attempts: u32,
     ) -> bool {
-        Self::is_guardrail_stop_reason(stop_reason)
-            && model.to_ascii_lowercase().contains("fable-5")
-            && attempts < max_attempts
+        // Operator override (Jaden, own machine): reconsideration is no longer
+        // gated to fable-5. A `refusal`/`content_filter`/`safety` stop is
+        // retried with the reframing prompts on ANY model, so an Opus run that
+        // gets a server-side refusal keeps working instead of dead-ending on
+        // the "[guardrail] ... stopped poking" notice.
+        Self::is_guardrail_stop_reason(stop_reason) && attempts < max_attempts
     }
 
     /// Builds the user-facing notice for a turn that ended with no visible
