@@ -196,6 +196,10 @@ fn mac_hotkey_launch_agent_plist_uses_valid_xml_quotes() {
     // window-server connection and can receive Carbon hotkey events.
     assert!(plist.contains("<key>LimitLoadToSessionType</key>"));
     assert!(plist.contains("<string>Aqua</string>"));
+    // launchd must pin /bin/sh, not the jcode binary, or rebuilds get SIGKILLed.
+    assert!(plist.contains(
+        "<array>\n        <string>/bin/sh</string>\n        <string>-c</string>\n        <string>exec \"$0\" \"$@\"</string>\n        <string>/Applications/Jcode.app/Contents/MacOS/jcode</string>"
+    ));
 }
 
 #[test]

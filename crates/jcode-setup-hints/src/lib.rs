@@ -390,6 +390,10 @@ fn mac_hotkey_launch_agent_path() -> Result<PathBuf> {
         .join("com.jcode.hotkey.plist"))
 }
 
+/// launchd pins the code signature of the program it launches, so pointing
+/// `ProgramArguments[0]` at jcode itself makes every rebuild fail with a
+/// "Launch Constraint Violation" SIGKILL until the agent is re-bootstrapped.
+/// Launching through `/bin/sh` pins the stable system shell instead.
 #[cfg(any(test, target_os = "macos"))]
 fn mac_hotkey_launch_agent_plist(
     exe: &str,
@@ -406,6 +410,9 @@ fn mac_hotkey_launch_agent_plist(
     <string>com.jcode.hotkey</string>
     <key>ProgramArguments</key>
     <array>
+        <string>/bin/sh</string>
+        <string>-c</string>
+        <string>exec "$0" "$@"</string>
         <string>{exe}</string>
         <string>setup-hotkey</string>
         <string>--listen-macos-hotkey</string>
